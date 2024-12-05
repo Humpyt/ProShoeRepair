@@ -1,0 +1,46 @@
+// Helper functions to transform data
+
+export const transformCustomer = (customer: any) => ({
+    id: customer.id,
+    name: customer.name,
+    phone: customer.phone,
+    email: customer.email || '',
+    address: customer.address || '',
+    notes: customer.notes || '',
+    status: customer.status || 'active',
+    totalOrders: customer.total_orders || 0,
+    totalSpent: customer.total_spent || 0,
+    lastVisit: customer.last_visit || null,
+    loyaltyPoints: customer.loyalty_points || 0,
+    createdAt: customer.created_at,
+    updatedAt: customer.updated_at
+});
+
+export const transformOperation = (operation: any) => ({
+    id: operation.id,
+    customerId: operation.customer_id,
+    status: operation.status || 'pending',
+    totalAmount: operation.total_amount || 0,
+    paidAmount: operation.paid_amount || 0,
+    notes: operation.notes || '',
+    promisedDate: operation.promised_date || null,
+    createdAt: operation.created_at,
+    updatedAt: operation.updated_at,
+    customer: operation.customer_id ? {
+        id: operation.customer_id,
+        name: operation.customer_name,
+        phone: operation.customer_phone
+    } : null
+});
+
+export const transformService = (service: any) => ({
+    id: service.id,
+    name: service.name,
+    description: service.description || '',
+    price: service.price || 0,
+    estimatedDays: service.estimated_days || 1,
+    category: service.category || '',
+    status: service.status || 'active',
+    createdAt: service.created_at,
+    updatedAt: service.updated_at
+});
