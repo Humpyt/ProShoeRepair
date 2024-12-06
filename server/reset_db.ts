@@ -1,15 +1,23 @@
 import Database from 'better-sqlite3';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'fs';
 
-// Initialize database
-const db = new Database(path.join(process.cwd(), 'server/shoerepair.db'));
+const dbPath = path.join(process.cwd(), 'server/shoerepair.db');
+
+// Delete existing database
+if (fs.existsSync(dbPath)) {
+    fs.unlinkSync(dbPath);
+    console.log('Existing database deleted');
+}
+
+// Create new database
+const db = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
 // Create tables
-db.exec(`
+const createTables = `
   -- Customers table
   CREATE TABLE IF NOT EXISTS customers (
     id TEXT PRIMARY KEY,
@@ -83,6 +91,38 @@ db.exec(`
     FOREIGN KEY (operation_shoe_id) REFERENCES operation_shoes (id),
     FOREIGN KEY (service_id) REFERENCES services (id)
   );
+`;
+
+// Execute table creation
+db.exec(createTables);
+console.log('Tables created successfully');
+
+// Add some dummy services
+const services = [
+  { name: 'Sole Replacement', price: 80.00, category: 'repair' },
+  { name: 'Heel Repair', price: 40.00, category: 'repair' },
+  { name: 'Cleaning', price: 25.00, category: 'cleaning' },
+  { name: 'Polishing', price: 15.00, category: 'cleaning' },
+  { name: 'Waterproofing', price: 30.00, category: 'protection' },
+  { name: 'Stretching', price: 20.00, category: 'adjustment' },
+];
+
+const insertService = db.prepare(`
+  INSERT INTO services (id, name, price, category, status, created_at, updated_at)
+  VALUES (?, ?, ?, ?, 'active', datetime('now'), datetime('now'))
 `);
 
-export default db;
+services.forEach((service, index) => {
+  insertService.run(
+    `service_${index + 1}`,
+    service.name,
+    service.price,
+    service.category
+  );
+});
+
+console.log('Services added successfully');
+
+// Close the database
+db.close();
+console.log('Database reset complete!');

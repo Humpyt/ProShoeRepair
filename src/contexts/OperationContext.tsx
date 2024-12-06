@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { Customer } from '../types';
 
 interface ShoeItem {
@@ -26,7 +26,7 @@ interface Operation {
 
 interface OperationContextType {
   operations: Operation[];
-  addOperation: (operation: Omit<Operation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addOperation: (operation: Omit<Operation, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Operation>;
   updateOperation: (id: string, operation: Partial<Operation>) => Promise<void>;
   deleteOperation: (id: string) => Promise<void>;
   getOperation: (id: string) => Operation | undefined;
@@ -37,30 +37,46 @@ const OperationContext = createContext<OperationContextType | undefined>(undefin
 export function OperationProvider({ children }: { children: React.ReactNode }) {
   const [operations, setOperations] = useState<Operation[]>([]);
 
-  const addOperation = useCallback(async (operation: Omit<Operation, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const now = new Date().toISOString();
-    const newOperation: Operation = {
-      ...operation,
-      id: Date.now().toString(),
-      createdAt: now,
-      updatedAt: now,
+  // Fetch operations when component mounts
+  useEffect(() => {
+    const fetchOperations = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/operations');
+        if (!response.ok) {
+          throw new Error('Failed to fetch operations');
+        }
+        const data = await response.json();
+        setOperations(data);
+      } catch (error) {
+        console.error('Error fetching operations:', error);
+      }
     };
 
+    fetchOperations();
+  }, []);
+
+  const addOperation = useCallback(async (operationData: Omit<Operation, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const response = await fetch('http://localhost:3000/api/operations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newOperation),
+        body: JSON.stringify(operationData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add operation');
+        const errorText = await response.text();
+        console.error('Server error:', errorText);
+        throw new Error(`Failed to add operation: ${errorText}`);
       }
 
-      const savedOperation = await response.json();
-      setOperations(prev => [...prev, savedOperation]);
+      const newOperation = await response.json() as Operation;
+      
+      // Update the operations state immediately with type safety
+      setOperations(prevOperations => [...prevOperations, newOperation]);
+      
+      return newOperation;
     } catch (error) {
       console.error('Error adding operation:', error);
       throw error;

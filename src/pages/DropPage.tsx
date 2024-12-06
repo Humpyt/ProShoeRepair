@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, User, Search, Star } from 'lucide-react';
+import { X, Plus, User, Search, Star, Percent, Scissors } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import type { Customer } from '../types';
 import { useCustomer } from '../contexts/CustomerContext';
 import { useOperation } from '../contexts/OperationContext';
-import { useNavigate } from 'react-router-dom';
 
 interface ItemCategory {
   id: string;
@@ -28,7 +27,13 @@ interface ShoeItem {
   id: string;
   category: string;
   color: string;
-  services: string[];
+  services: {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    notes: string | null;
+  }[];
 }
 
 interface CustomerModalProps {
@@ -69,22 +74,16 @@ const colors: ColorOption[] = [
 ];
 
 const services: RepairService[] = [
+  { id: 'sole-replacement', name: 'Sole Replacement', price: 80000 },
+  { id: 'heel-repair', name: 'Heel Repair', price: 40000 },
+  { id: 'cleaning', name: 'Cleaning', price: 25000 },
+  { id: 'polishing', name: 'Polishing', price: 15000 },
+  { id: 'waterproofing', name: 'Waterproofing', price: 30000 },
+  { id: 'stretching', name: 'Stretching', price: 20000 },
   { id: 'elastic', name: 'Elastic', price: 15000 },
-  { id: 'glue', name: 'Glue', price: 10000 },
   { id: 'hardware', name: 'Hardware', price: 20000 },
   { id: 'heel-fix', name: 'Heel Fix', price: 25000 },
-  { id: 'heel', name: 'Heel', price: 30000 },
-  { id: 'insoles', name: 'Insoles', price: 12000 },
-  { id: 'misc', name: 'Misc', price: 8000 },
-  { id: 'pad', name: 'Pad', price: 10000 },
-  { id: 'patches', name: 'Patches', price: 18000 },
-  { id: 'rips', name: 'Rips', price: 15000 },
-  { id: 'sling', name: 'Sling', price: 20000 },
-  { id: 'stitch', name: 'Stitch', price: 12000 },
-  { id: 'straps', name: 'Straps', price: 25000 },
-  { id: 'stretch', name: 'Stretch', price: 15000 },
-  { id: 'tassels', name: 'Tassels', price: 10000 },
-  { id: 'zipper', name: 'Zipper', price: 30000 }
+  { id: 'misc', name: 'Misc', price: 8000 }
 ];
 
 const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
@@ -276,7 +275,6 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
 export default function DropPage() {
   const { customers, addCustomer, updateCustomer } = useCustomer();
   const { addOperation } = useOperation();
-  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
@@ -331,12 +329,25 @@ export default function DropPage() {
 
   const handleAddShoe = () => {
     if (selectedCategory && selectedColor && selectedServices.length > 0) {
-      const newShoe: ShoeItem = {
+      const shoeServices = selectedServices.map(serviceId => {
+        const service = services.find(s => s.id === serviceId);
+        if (!service) return null;
+        return {
+          id: service.id,
+          name: service.name,
+          price: service.price,
+          quantity: 1,
+          notes: null
+        };
+      }).filter(Boolean);
+
+      const newShoe = {
         id: Date.now().toString(),
         category: selectedCategory,
         color: selectedColor,
-        services: selectedServices,
+        services: shoeServices,
       };
+      
       setShoes([...shoes, newShoe]);
       setSelectedCategory(null);
       setSelectedColor(null);
@@ -350,9 +361,8 @@ export default function DropPage() {
 
   const calculateTotal = () => {
     return shoes.reduce((total, shoe) => {
-      const shoeTotal = shoe.services.reduce((sum, serviceId) => {
-        const service = services.find(s => s.id === serviceId);
-        return sum + (service?.price || 0);
+      const shoeTotal = shoe.services.reduce((sum, service) => {
+        return sum + (service.price || 0) * (service.quantity || 1);
       }, 0);
       return total + shoeTotal;
     }, 0);
@@ -364,27 +374,59 @@ export default function DropPage() {
   }, 0);
 
   const handleSaveToOperations = async () => {
-    if (shoes.length === 0) return;
+    if (shoes.length === 0) {
+      alert('Please add at least one shoe to save');
+      return;
+    }
+
+    if (!selectedCustomer) {
+      alert('Please select a customer before saving');
+      return;
+    }
 
     try {
-      await addOperation({
+      const operationData = {
         customer: selectedCustomer,
-        shoes,
+        shoes: shoes.map(shoe => ({
+          ...shoe,
+          services: shoe.services.map(service => ({
+            ...service,
+            quantity: service.quantity || 1,
+            notes: service.notes || null
+          }))
+        })),
         status: 'pending',
         totalAmount: calculateTotal(),
         isNoCharge: false,
         isDoOver: false,
         isDelivery: false,
         isPickup: false,
+        notes: ''
+      };
+      
+      const response = await fetch('http://localhost:3000/api/operations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(operationData),
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to save operation: ${errorText}`);
+      }
 
-      // Clear the form
+      const savedOperation = await response.json();
+
+      // Clear the form but don't navigate away
       handleCancel();
       
-      // Navigate to operations page
-      navigate('/operations');
+      // Show success message
+      alert('Operation saved successfully!');
     } catch (error) {
-      console.error('Error saving to operations:', error);
+      console.error('Error in handleSaveToOperations:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save operation. Please try again.');
     }
   };
 
@@ -407,7 +449,7 @@ export default function DropPage() {
       handleCancel();
       
       // Navigate to operations page
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error holding operation:', error);
     }
@@ -429,7 +471,7 @@ export default function DropPage() {
       });
 
       handleCancel();
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error creating no-charge operation:', error);
     }
@@ -451,7 +493,7 @@ export default function DropPage() {
       });
 
       handleCancel();
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error creating do-over operation:', error);
     }
@@ -473,7 +515,7 @@ export default function DropPage() {
       });
 
       handleCancel();
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error creating delivery operation:', error);
     }
@@ -495,7 +537,7 @@ export default function DropPage() {
       });
 
       handleCancel();
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error creating pickup operation:', error);
     }
@@ -525,7 +567,7 @@ export default function DropPage() {
 
       setShowDiscountModal(false);
       handleCancel();
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error creating discounted operation:', error);
     }
@@ -565,7 +607,7 @@ export default function DropPage() {
 
       setShowSplitModal(false);
       handleCancel();
-      navigate('/operations');
+      // navigate('/operations');
     } catch (error) {
       console.error('Error creating split tickets:', error);
     }
@@ -805,9 +847,8 @@ export default function DropPage() {
                 {shoes.map((shoe) => {
                   const category = categories.find(c => c.id === shoe.category);
                   const color = colors.find(c => c.id === shoe.color);
-                  const shoeTotal = shoe.services.reduce((sum, serviceId) => {
-                    const service = services.find(s => s.id === serviceId);
-                    return sum + (service?.price || 0);
+                  const shoeTotal = shoe.services.reduce((sum, service) => {
+                    return sum + (service.price || 0) * (service.quantity || 1);
                   }, 0);
 
                   return (
@@ -816,7 +857,7 @@ export default function DropPage() {
                         <div className="flex items-center space-x-3">
                           <span className="text-xl">{category?.icon}</span>
                           <div>
-                            <div className="text-sm font-medium">{category?.name}</div>
+                            <div className="text-sm font-semibold">{category?.name}</div>
                             <div className="flex items-center mt-1">
                               <div 
                                 className={`w-3 h-3 rounded-full ${color?.bgClass} mr-2`}
@@ -836,11 +877,10 @@ export default function DropPage() {
                         </div>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {shoe.services.map(serviceId => {
-                          const service = services.find(s => s.id === serviceId);
+                        {shoe.services.map(service => {
                           return (
-                            <div key={serviceId} className="bg-gray-700 rounded px-2 py-1">
-                              <span className="text-xs">{service?.name}</span>
+                            <div key={service.id} className="bg-gray-700 rounded px-2 py-1">
+                              <span className="text-xs">{service.name}</span>
                             </div>
                           );
                         })}
@@ -868,124 +908,144 @@ export default function DropPage() {
         </div>
 
         <div className="col-span-3">
-          <div className="card-bevel p-4 space-y-4">
-            <button 
-              className="btn-bevel accent-primary w-full py-3 rounded-lg"
-              onClick={handleNoCharge}
-              disabled={shoes.length === 0}
-            >
-              No Charge
-            </button>
-            <button 
-              className="btn-bevel accent-secondary w-full py-3 rounded-lg"
-              onClick={handleDoOver}
-              disabled={shoes.length === 0}
-            >
-              Do Over
-            </button>
-            <button 
-              className="btn-bevel accent-tertiary w-full py-3 rounded-lg"
-              onClick={handleDiscount}
-              disabled={shoes.length === 0}
-            >
-              Discount
-            </button>
-            <button 
-              className="btn-bevel bg-gray-700 w-full py-3 rounded-lg"
-              onClick={handleSplitTicket}
-              disabled={shoes.length === 0}
-            >
-              Split Ticket
-            </button>
-          </div>
+          <div className="space-y-2 mb-4">
+            <div className="space-y-2">
+              <button
+                onClick={handleNoCharge}
+                className="w-full btn-bevel bg-indigo-600 hover:bg-indigo-700 p-3 rounded-lg"
+              >
+                No Charge
+              </button>
+              <button
+                onClick={handleDoOver}
+                className="w-full btn-bevel bg-emerald-600 hover:bg-emerald-700 p-3 rounded-lg"
+              >
+                Do Over
+              </button>
+              <button
+                onClick={handleDiscount}
+                className="w-full btn-bevel bg-orange-600 hover:bg-orange-700 p-3 rounded-lg"
+              >
+                Discount
+              </button>
+              <button
+                onClick={handleSplitTicket}
+                className="w-full btn-bevel bg-gray-600 hover:bg-gray-700 p-3 rounded-lg"
+              >
+                Split Ticket
+              </button>
+            </div>
 
-          <div className="card-bevel p-4 space-y-4 mt-4">
-            <button 
-              className="btn-bevel accent-primary w-full py-3 rounded-lg"
-              onClick={handleDelivery}
-              disabled={shoes.length === 0}
-            >
-              Delivery
-            </button>
-            <button 
-              className="btn-bevel accent-secondary w-full py-3 rounded-lg"
-              onClick={handlePickup}
-              disabled={shoes.length === 0}
-            >
-              Pickup
-            </button>
-          </div>
+            <div className="space-y-2">
+              <button
+                onClick={handleDelivery}
+                className="w-full btn-bevel bg-indigo-600 hover:bg-indigo-700 p-3 rounded-lg"
+              >
+                Delivery
+              </button>
+              <button
+                onClick={handlePickup}
+                className="w-full btn-bevel bg-emerald-600 hover:bg-emerald-700 p-3 rounded-lg"
+              >
+                Pickup
+              </button>
+            </div>
 
-          <div className="card-bevel p-4 space-y-4 mt-4">
-            <button 
-              className="btn-bevel accent-primary w-full py-3 rounded-lg"
-              onClick={handleSaveToOperations}
-              disabled={shoes.length === 0}
-            >
-              Save to Operations
-            </button>
-            <button 
-              className="btn-bevel accent-secondary w-full py-3 rounded-lg"
-              onClick={handleHold}
-              disabled={shoes.length === 0}
-            >
-              Hold
-            </button>
-            <button
-              onClick={handleCancel}
-              className="btn-bevel accent-secondary w-full py-3 rounded-lg"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleClearLastEntry}
-              disabled={shoes.length === 0}
-              className={`btn-bevel bg-gray-700 w-full py-3 rounded-lg ${
-                shoes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              Clear Last Entry
-            </button>
-            <button
-              onClick={handleDeleteItem}
-              disabled={!selectedCategory && !selectedColor && selectedServices.length === 0}
-              className={`btn-bevel bg-gray-700 w-full py-3 rounded-lg ${
-                !selectedCategory && !selectedColor && selectedServices.length === 0 
-                ? 'opacity-50 cursor-not-allowed' 
-                : ''
-              }`}
-            >
-              Delete Item
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleSaveToOperations}
+                className="w-full btn-bevel bg-indigo-600 hover:bg-indigo-700 p-3 rounded-lg"
+              >
+                Save to Operations
+              </button>
+              <button
+                onClick={handleHold}
+                className="w-full btn-bevel bg-emerald-600 hover:bg-emerald-700 p-3 rounded-lg"
+              >
+                Hold
+              </button>
+              <button
+                onClick={handleCancel}
+                className="w-full btn-bevel bg-emerald-600 hover:bg-emerald-700 p-3 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                onClick={handleClearLastEntry}
+                className="w-full btn-bevel bg-gray-600 hover:bg-gray-700 p-3 rounded-lg"
+              >
+                Clear Last Entry
+              </button>
+              <button
+                onClick={handleDeleteItem}
+                className="w-full btn-bevel bg-gray-600 hover:bg-gray-700 p-3 rounded-lg"
+              >
+                Delete Item
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Discount Modal */}
       {showDiscountModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-gray-800 p-6 rounded-lg w-96">
-            <h3 className="text-lg font-semibold mb-4">Apply Discount</h3>
-            <input
-              type="number"
-              value={discountAmount}
-              onChange={(e) => setDiscountAmount(Number(e.target.value))}
-              className="w-full bg-gray-700 rounded-lg px-4 py-2 mb-4"
-              placeholder="Enter discount amount"
-            />
-            <div className="flex justify-end space-x-4">
-              <button
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold flex items-center">
+                <Percent className="h-5 w-5 mr-2" />
+                Apply Discount
+              </h2>
+              <button 
                 onClick={() => setShowDiscountModal(false)}
-                className="btn-secondary px-4 py-2"
+                className="text-gray-400 hover:text-white transition-colors"
               >
-                Cancel
+                <X size={24} />
               </button>
-              <button
-                onClick={handleApplyDiscount}
-                className="btn-primary px-4 py-2"
-              >
-                Apply
-              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Discount Amount (UGX)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={calculateTotal()}
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                  className="w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-sm">
+                <span>Original Total:</span>
+                <span>{formatCurrency(calculateTotal())}</span>
+              </div>
+
+              <div className="flex justify-between items-center text-sm font-semibold">
+                <span>Final Total:</span>
+                <span>{formatCurrency((calculateTotal() - discountAmount))}</span>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowDiscountModal(false)}
+                  className="px-4 py-2 rounded-lg btn-bevel"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApplyDiscount}
+                  className="px-4 py-2 rounded-lg accent-primary flex items-center"
+                  disabled={discountAmount <= 0 || discountAmount >= calculateTotal()}
+                >
+                  <Percent className="h-4 w-4 mr-2" />
+                  Apply Discount
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -993,30 +1053,65 @@ export default function DropPage() {
 
       {/* Split Ticket Modal */}
       {showSplitModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-gray-800 p-6 rounded-lg w-96">
-            <h3 className="text-lg font-semibold mb-4">Split Ticket</h3>
-            <input
-              type="number"
-              value={splitCount}
-              onChange={(e) => setSplitCount(Math.max(2, Number(e.target.value)))}
-              className="w-full bg-gray-700 rounded-lg px-4 py-2 mb-4"
-              placeholder="Enter number of splits"
-              min="2"
-            />
-            <div className="flex justify-end space-x-4">
-              <button
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold flex items-center">
+                <Scissors className="h-5 w-5 mr-2" />
+                Split Ticket
+              </h2>
+              <button 
                 onClick={() => setShowSplitModal(false)}
-                className="btn-secondary px-4 py-2"
+                className="text-gray-400 hover:text-white transition-colors"
               >
-                Cancel
+                <X size={24} />
               </button>
-              <button
-                onClick={handleApplySplit}
-                className="btn-primary px-4 py-2"
-              >
-                Split
-              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Number of Splits</label>
+                <input
+                  type="number"
+                  min="2"
+                  max={shoes.length}
+                  value={splitCount}
+                  onChange={(e) => setSplitCount(Math.max(2, Math.min(shoes.length, Number(e.target.value))))}
+                  className="w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-sm">
+                  <span>Total Amount:</span>
+                  <span>{formatCurrency(calculateTotal())}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span>Amount per Ticket:</span>
+                  <span>{formatCurrency((calculateTotal() / splitCount))}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span>Shoes per Ticket:</span>
+                  <span>{Math.ceil(shoes.length / splitCount)}</span>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowSplitModal(false)}
+                  className="px-4 py-2 rounded-lg btn-bevel"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApplySplit}
+                  className="px-4 py-2 rounded-lg accent-primary flex items-center"
+                  disabled={splitCount < 2 || splitCount > shoes.length}
+                >
+                  <Scissors className="h-4 w-4 mr-2" />
+                  Split Ticket
+                </button>
+              </div>
             </div>
           </div>
         </div>

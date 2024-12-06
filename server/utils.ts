@@ -26,11 +26,16 @@ export const transformOperation = (operation: any) => ({
     promisedDate: operation.promised_date || null,
     createdAt: operation.created_at,
     updatedAt: operation.updated_at,
+    isNoCharge: Boolean(operation.is_no_charge),
+    isDoOver: Boolean(operation.is_do_over),
+    isDelivery: Boolean(operation.is_delivery),
+    isPickup: Boolean(operation.is_pickup),
     customer: operation.customer_id ? {
         id: operation.customer_id,
         name: operation.customer_name,
         phone: operation.customer_phone
-    } : null
+    } : null,
+    shoes: operation.shoes || []
 });
 
 export const transformService = (service: any) => ({

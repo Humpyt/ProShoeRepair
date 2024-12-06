@@ -17,6 +17,10 @@ db.exec(`
     promised_date TEXT,
     created_at TEXT,
     updated_at TEXT,
+    is_no_charge INTEGER DEFAULT 0,
+    is_do_over INTEGER DEFAULT 0,
+    is_delivery INTEGER DEFAULT 0,
+    is_pickup INTEGER DEFAULT 0,
     FOREIGN KEY (customer_id) REFERENCES customers (id)
   )
 `);
@@ -60,8 +64,37 @@ router.get('/', (req, res) => {
       LEFT JOIN customers c ON o.customer_id = c.id
       ORDER BY o.created_at DESC
     `).all();
-    res.json(operations.map(transformOperation));
+
+    // Get shoes and services for each operation
+    const operationsWithShoes = operations.map(operation => {
+      const shoes = db.prepare(`
+        SELECT os.*, s.name as service_name, s.price as service_base_price
+        FROM operation_shoes os
+        LEFT JOIN operation_services oss ON os.id = oss.operation_shoe_id
+        LEFT JOIN services s ON oss.service_id = s.id
+        WHERE os.operation_id = ?
+      `).all(operation.id);
+
+      return {
+        ...operation,
+        shoes: shoes.map(shoe => ({
+          id: shoe.id,
+          category: shoe.category,
+          color: shoe.color,
+          notes: shoe.notes,
+          services: [{
+            id: shoe.service_id,
+            name: shoe.service_name,
+            price: shoe.price,
+            basePrice: shoe.service_base_price
+          }]
+        }))
+      };
+    });
+
+    res.json(operationsWithShoes.map(transformOperation));
   } catch (error) {
+    console.error('Failed to fetch operations:', error);
     res.status(500).json({ error: 'Failed to fetch operations' });
   }
 });
@@ -89,75 +122,161 @@ router.get('/:id', (req, res) => {
 
 // Create new operation
 router.post('/', (req, res) => {
+  console.log('Received operation request:', JSON.stringify(req.body, null, 2)); // Debug log
+  const { customer, shoes, status, totalAmount, isNoCharge, isDoOver, isDelivery, isPickup, notes } = req.body;
+  const now = new Date().toISOString();
+
+  if (!customer || !customer.id) {
+    console.error('Invalid customer data:', customer);
+    return res.status(400).json({ error: 'Invalid customer data' });
+  }
+
+  if (!Array.isArray(shoes) || shoes.length === 0) {
+    console.error('Invalid shoes data:', shoes);
+    return res.status(400).json({ error: 'Invalid shoes data' });
+  }
+
   try {
-    const { customerId, shoes, notes, promisedDate } = req.body;
-    const now = new Date().toISOString();
-    
-    // Start transaction
-    const transaction = db.transaction(() => {
-      // Create operation
+    const result = db.transaction(() => {
+      // Insert the operation
       const operationId = uuidv4();
-      db.prepare(`
+      console.log('Creating operation with ID:', operationId); // Debug log
+
+      const operationStmt = db.prepare(`
         INSERT INTO operations (
-          id, customer_id, notes, promised_date,
+          id, customer_id, status, total_amount, notes, 
+          is_no_charge, is_do_over, is_delivery, is_pickup,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `).run(operationId, customerId, notes, promisedDate, now, now);
-      
-      // Add shoes and services
-      let totalAmount = 0;
-      
-      shoes.forEach((shoe: any) => {
-        const shoeId = uuidv4();
-        db.prepare(`
-          INSERT INTO operation_shoes (
-            id, operation_id, category, color, notes,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          shoeId, operationId, shoe.category, shoe.color, shoe.notes,
-          now, now
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      try {
+        operationStmt.run(
+          operationId,
+          customer.id,
+          status || 'pending',
+          totalAmount || 0,
+          notes || null,
+          isNoCharge ? 1 : 0,
+          isDoOver ? 1 : 0,
+          isDelivery ? 1 : 0,
+          isPickup ? 1 : 0,
+          now,
+          now
         );
+      } catch (error) {
+        console.error('Error inserting operation:', error);
+        throw error;
+      }
+
+      // Insert each shoe
+      shoes.forEach((shoe, index) => {
+        console.log(`Processing shoe ${index + 1}:`, JSON.stringify(shoe, null, 2)); // Debug log
+        const shoeId = uuidv4();
         
-        shoe.services.forEach((service: any) => {
-          const serviceAmount = service.price * (service.quantity || 1);
-          totalAmount += serviceAmount;
-          
+        try {
           db.prepare(`
-            INSERT INTO operation_services (
-              id, operation_shoe_id, service_id,
-              quantity, price, notes,
-              created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO operation_shoes (
+              id, operation_id, category, color, notes, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
           `).run(
-            uuidv4(), shoeId, service.id,
-            service.quantity || 1, service.price, service.notes,
-            now, now
+            shoeId,
+            operationId,
+            shoe.category,
+            shoe.color || null,
+            shoe.notes || null,
+            now,
+            now
           );
-        });
+
+          // Insert services for each shoe
+          if (Array.isArray(shoe.services)) {
+            shoe.services.forEach((service, sIndex) => {
+              console.log(`Processing service ${sIndex + 1} for shoe ${index + 1}:`, JSON.stringify(service, null, 2)); // Debug log
+              
+              try {
+                db.prepare(`
+                  INSERT INTO operation_services (
+                    id, operation_shoe_id, service_id, quantity, price, notes,
+                    created_at, updated_at
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                `).run(
+                  uuidv4(),
+                  shoeId,
+                  service.id,
+                  service.quantity || 1,
+                  service.price || 0,
+                  service.notes || null,
+                  now,
+                  now
+                );
+              } catch (error) {
+                console.error(`Error inserting service ${sIndex + 1} for shoe ${index + 1}:`, error);
+                throw error;
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error processing shoe ${index + 1}:`, error);
+          throw error;
+        }
       });
-      
-      // Update operation total
-      db.prepare(`
-        UPDATE operations
-        SET total_amount = ?
-        WHERE id = ?
-      `).run(totalAmount, operationId);
-      
-      return operationId;
-    });
-    
-    // Get created operation
-    const operation = db.prepare(`
-      SELECT o.*, c.name as customer_name, c.phone as customer_phone
-      FROM operations o
-      LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.id = ?
-    `).get(transaction());
-    
-    res.status(201).json(transformOperation(operation));
+
+      // Return the created operation with all related data
+      const operation = db.prepare(`
+        SELECT 
+          o.*,
+          c.name as customer_name,
+          c.phone as customer_phone,
+          c.email as customer_email
+        FROM operations o
+        LEFT JOIN customers c ON o.customer_id = c.id
+        WHERE o.id = ?
+      `).get(operationId);
+
+      // Get shoes for this operation
+      const operationShoes = db.prepare(`
+        SELECT * FROM operation_shoes WHERE operation_id = ?
+      `).all(operationId);
+
+      // Get services for each shoe
+      const shoesWithServices = operationShoes.map(shoe => {
+        const services = db.prepare(`
+          SELECT 
+            os.*,
+            s.name as service_name,
+            s.price as service_base_price
+          FROM operation_services os
+          LEFT JOIN services s ON os.service_id = s.id
+          WHERE os.operation_shoe_id = ?
+        `).all(shoe.id);
+
+        return {
+          ...shoe,
+          services: services.map(s => ({
+            id: s.service_id,
+            name: s.service_name,
+            price: s.price,
+            quantity: s.quantity,
+            notes: s.notes
+          }))
+        };
+      });
+
+      return {
+        ...operation,
+        shoes: shoesWithServices,
+        isNoCharge: Boolean(operation.is_no_charge),
+        isDoOver: Boolean(operation.is_do_over),
+        isDelivery: Boolean(operation.is_delivery),
+        isPickup: Boolean(operation.is_pickup)
+      };
+    })();
+
+    res.json(result);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to create operation' });
+    console.error('Error creating operation:', error);
+    res.status(500).json({ error: error.message || 'Failed to create operation' });
   }
 });
 
