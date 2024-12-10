@@ -63,52 +63,63 @@ export function StaffModal({ isOpen, onClose, onSave, staff }: StaffModalProps) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg w-full max-w-md p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-lg w-full max-w-md p-6 shadow-xl border border-gray-800">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-white">
             {staff ? 'Edit Staff Member' : 'Add New Staff Member'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button 
+            onClick={onClose} 
+            className="text-gray-400 hover:text-gray-300 hover:bg-gray-800 p-1 rounded-full transition-colors"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Name
             </label>
             <input
               type="text"
               required
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full rounded-lg bg-gray-800 border-gray-700 text-white placeholder-gray-400
+                focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                transition-colors"
+              placeholder="Enter staff name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Email
             </label>
             <input
               type="email"
               required
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full rounded-lg bg-gray-800 border-gray-700 text-white placeholder-gray-400
+                focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                transition-colors"
+              placeholder="Enter email address"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Role
             </label>
             <select
-              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              className="w-full rounded-lg bg-gray-800 border-gray-700 text-white
+                focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
+                transition-colors"
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as Staff['role'] })}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             >
               <option value="technician">Technician</option>
               <option value="manager">Manager</option>
@@ -117,45 +128,61 @@ export function StaffModal({ isOpen, onClose, onSave, staff }: StaffModalProps) 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-300 mb-1.5">
               Specialization
             </label>
-            <div className="space-y-2">
-              <label className="inline-flex items-center">
+            <div className="flex gap-3">
+              <label className="flex items-center">
                 <input
                   type="checkbox"
-                  className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="rounded bg-gray-800 border-gray-700 text-indigo-500 
+                    focus:ring-indigo-500 focus:ring-offset-gray-900"
                   checked={formData.specialization.includes('shoe')}
                   onChange={() => handleSpecializationChange('shoe')}
                 />
-                <span className="ml-2">Shoe Repair</span>
+                <span className="ml-2 text-gray-300">Shoe Repair</span>
               </label>
-              <br />
-              <label className="inline-flex items-center">
+              <label className="flex items-center">
                 <input
                   type="checkbox"
-                  className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  className="rounded bg-gray-800 border-gray-700 text-indigo-500 
+                    focus:ring-indigo-500 focus:ring-offset-gray-900"
                   checked={formData.specialization.includes('bag')}
                   onChange={() => handleSpecializationChange('bag')}
                 />
-                <span className="ml-2">Bag Repair</span>
+                <span className="ml-2 text-gray-300">Bag Repair</span>
               </label>
             </div>
           </div>
 
-          <div className="flex justify-end space-x-3 mt-6">
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                className="rounded bg-gray-800 border-gray-700 text-indigo-500 
+                  focus:ring-indigo-500 focus:ring-offset-gray-900"
+                checked={formData.active}
+                onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+              />
+              <span className="ml-2 text-gray-300">Active Status</span>
+            </label>
+          </div>
+
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              className="flex-1 px-4 py-2 border border-gray-600 text-gray-300 rounded-lg
+                hover:bg-gray-800 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg
+                hover:bg-indigo-700 transition-colors"
             >
-              {staff ? 'Save Changes' : 'Add Staff Member'}
+              {staff ? 'Save Changes' : 'Add Staff'}
             </button>
           </div>
         </form>

@@ -3,6 +3,8 @@ import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import db from './database';
 import operationsRouter from './operations';
+import inventoryRouter from './routes/inventory';
+import printerRouter from './routes/printer';
 import { transformCustomer, transformOperation, transformService } from './utils';
 
 const app = express();
@@ -11,50 +13,50 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// Use operations router
+// Add error handling middleware
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: err.message });
+});
+
+// Basic health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// Use routers
 app.use('/api/operations', operationsRouter);
+app.use('/api', inventoryRouter);
+// Temporarily disable printer routes
+// app.use('/api/printer', printerRouter);
 
 // Customer endpoints
 app.get('/api/customers', (req, res) => {
   try {
     const customers = db.prepare(`
       SELECT * FROM customers
-      WHERE status = 'active'
       ORDER BY name ASC
     `).all();
-    res.json(customers.map(transformCustomer));
+    res.json(customers);
   } catch (error) {
+    console.error('Error fetching customers:', error);
     res.status(500).json({ error: 'Failed to fetch customers' });
   }
 });
 
 app.post('/api/customers', (req, res) => {
   try {
-    const { 
-      name, phone, email = '', address = '', notes = '', 
-      status = 'active', totalOrders = 0, totalSpent = 0, 
-      lastVisit = new Date().toISOString(), 
-      loyaltyPoints = 0 
-    } = req.body;
-    
+    const { name, phone, email, address } = req.body;
     const id = uuidv4();
-    const now = new Date().toISOString();
     
-    db.prepare(`
-      INSERT INTO customers (
-        id, name, phone, email, address, notes, status,
-        total_orders, total_spent, last_visit, loyalty_points,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id, name, phone, email, address, notes, status,
-      totalOrders, totalSpent, lastVisit, loyaltyPoints,
-      now, now
-    );
-
-    const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
-    res.status(201).json(transformCustomer(customer));
+    const result = db.prepare(`
+      INSERT INTO customers (id, name, phone, email, address)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, name, phone, email, address);
+    
+    res.json({ id, name, phone, email, address });
   } catch (error) {
+    console.error('Error creating customer:', error);
     res.status(500).json({ error: 'Failed to create customer' });
   }
 });
@@ -82,8 +84,9 @@ app.put('/api/customers/:id', (req, res) => {
     `).run(...values);
 
     const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(id);
-    res.json(transformCustomer(customer));
+    res.json(customer);
   } catch (error) {
+    console.error('Error updating customer:', error);
     res.status(500).json({ error: 'Failed to update customer' });
   }
 });
@@ -101,6 +104,7 @@ app.delete('/api/customers/:id', (req, res) => {
     
     res.status(204).send();
   } catch (error) {
+    console.error('Error deleting customer:', error);
     res.status(500).json({ error: 'Failed to delete customer' });
   }
 });
@@ -117,6 +121,7 @@ app.get('/api/orders', (req, res) => {
     const transformedOrders = orders.map(transformOperation);
     res.json(transformedOrders);
   } catch (error) {
+    console.error('Error fetching orders:', error);
     res.status(500).json({ error: 'Failed to fetch orders' });
   }
 });
@@ -172,17 +177,59 @@ app.post('/api/orders', (req, res) => {
     const order = transaction();
     res.status(201).json(transformOperation(order));
   } catch (error) {
+    console.error('Error creating order:', error);
     res.status(500).json({ error: 'Failed to create order' });
   }
 });
 
-// Service routes
+// Operations endpoints
+app.get('/api/operations', (req, res) => {
+  try {
+    const operations = db.prepare(`
+      SELECT 
+        o.*,
+        c.name as customer_name,
+        c.phone as customer_phone
+      FROM operations o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      ORDER BY o.created_at DESC
+    `).all();
+
+    const operationsWithDetails = operations.map(operation => {
+      const shoes = db.prepare(`
+        SELECT 
+          s.*,
+          GROUP_CONCAT(srv.name) as services
+        FROM operation_shoes s
+        LEFT JOIN operation_services os ON s.id = os.operation_shoe_id
+        LEFT JOIN services srv ON os.service_id = srv.id
+        WHERE s.operation_id = ?
+        GROUP BY s.id
+      `).all(operation.id);
+
+      return {
+        ...operation,
+        shoes: shoes.map(shoe => ({
+          ...shoe,
+          services: shoe.services ? shoe.services.split(',') : []
+        }))
+      };
+    });
+
+    res.json(operationsWithDetails);
+  } catch (error) {
+    console.error('Error fetching operations:', error);
+    res.status(500).json({ error: 'Failed to fetch operations' });
+  }
+});
+
+// Services endpoints
 app.get('/api/services', (req, res) => {
   try {
-    const services = db.prepare('SELECT * FROM services WHERE status = ?').all('active');
-    const transformedServices = services.map(transformService);
-    res.json(transformedServices);
+    const services = db.prepare('SELECT * FROM services ORDER BY name ASC').all();
+    res.json(services);
   } catch (error) {
+    console.error('Error fetching services:', error);
     res.status(500).json({ error: 'Failed to fetch services' });
   }
 });
@@ -199,16 +246,80 @@ app.post('/api/services', (req, res) => {
 
     if (result.changes > 0) {
       const service = db.prepare('SELECT * FROM services WHERE id = ?').get(id);
-      res.status(201).json(transformService(service));
+      res.status(201).json(service);
     } else {
       res.status(400).json({ error: 'Failed to create service' });
     }
   } catch (error) {
+    console.error('Error creating service:', error);
     res.status(500).json({ error: 'Failed to create service' });
+  }
+});
+
+// Sales endpoints
+app.get('/api/sales-categories', (req, res) => {
+  try {
+    const categories = db.prepare(`
+      SELECT * FROM sales_categories 
+      ORDER BY display_order ASC
+    `).all();
+    res.json(categories);
+  } catch (error) {
+    console.error('Error fetching sales categories:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/sales-items', (req, res) => {
+  try {
+    const items = db.prepare(`
+      SELECT 
+        sales_items.*,
+        sales_categories.name as category_name
+      FROM sales_items
+      JOIN sales_categories ON sales_items.category_id = sales_categories.id
+      ORDER BY sales_categories.display_order ASC, sales_items.name ASC
+    `).all();
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching sales items:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/sales-items/category/:categoryId', (req, res) => {
+  try {
+    const items = db.prepare(`
+      SELECT * FROM sales_items 
+      WHERE category_id = ?
+      ORDER BY name ASC
+    `).all(req.params.categoryId);
+    res.json(items);
+  } catch (error) {
+    console.error('Error fetching sales items by category:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+  console.log(`Server is running on http://localhost:${port}`);
+  console.log('Database file:', db.name);
+  
+  // Test database connection
+  try {
+    const customerCount = db.prepare('SELECT COUNT(*) as count FROM customers').get();
+    console.log('Connected to database. Customer count:', customerCount.count);
+  } catch (error) {
+    console.error('Database connection error:', error);
+  }
+});
+
+// Handle process errors
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
 });

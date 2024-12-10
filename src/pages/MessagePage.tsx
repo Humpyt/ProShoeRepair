@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { 
   MessageSquare, Search, History, User, 
   Send, FileText, Plus, Edit2, Trash2,
-  CheckCircle, AlertCircle, Clock
+  CheckCircle, AlertCircle, Clock, Phone
 } from 'lucide-react';
+import { whatsappService } from '../services/whatsapp';
+import WhatsAppConfig from '../components/WhatsAppConfig';
 
 interface MessageTemplate {
   id: string;
@@ -11,6 +13,7 @@ interface MessageTemplate {
   content: string;
   category: 'status' | 'reminder' | 'promotion';
   variables: string[];
+  whatsappTemplate?: string;
 }
 
 interface MessageHistory {
@@ -63,21 +66,24 @@ const defaultTemplates: MessageTemplate[] = [
     name: 'Order Ready',
     content: 'Hello {customerName}, your order #{orderNumber} is ready for pickup at RepairPRO. Total amount: {amount}. We\'re open Mon-Sat, 9AM-6PM.',
     category: 'status',
-    variables: ['customerName', 'orderNumber', 'amount']
+    variables: ['customerName', 'orderNumber', 'amount', 'phone'],
+    whatsappTemplate: 'order_ready'
   },
   {
     id: '2',
     name: 'Appointment Reminder',
     content: 'Hi {customerName}, this is a reminder for your repair appointment tomorrow at {time}. Please bring your {itemType}.',
     category: 'reminder',
-    variables: ['customerName', 'time', 'itemType']
+    variables: ['customerName', 'time', 'itemType', 'phone'],
+    whatsappTemplate: 'appointment_reminder'
   },
   {
     id: '3',
     name: 'Special Offer',
-    content: 'Dear {customerName}, enjoy 20% off on all repairs this week! Book your appointment now.',
+    content: 'Dear {customerName}, enjoy {discount} off on all repairs until {validUntil}! Book your appointment now.',
     category: 'promotion',
-    variables: ['customerName']
+    variables: ['customerName', 'discount', 'validUntil', 'phone'],
+    whatsappTemplate: 'promotion'
   }
 ];
 
@@ -88,7 +94,8 @@ export default function MessagePage() {
   const [previewData, setPreviewData] = useState<Record<string, string>>({});
   const [filterCategory, setFilterCategory] = useState<MessageTemplate['category'] | 'all'>('all');
   const [showHistory, setShowHistory] = useState(false);
-  const [messageHistory] = useState<MessageHistory[]>(mockMessageHistory);
+  const [messageHistory, setMessageHistory] = useState<MessageHistory[]>(mockMessageHistory);
+  const [showConfig, setShowConfig] = useState(false);
 
   const handleTemplateSelect = (template: MessageTemplate) => {
     setSelectedTemplate(template);
@@ -126,6 +133,65 @@ export default function MessagePage() {
     }
   };
 
+  const handleSendMessage = async () => {
+    if (!selectedTemplate || !previewData.phone) {
+      alert('Please fill in all required fields, including phone number');
+      return;
+    }
+
+    try {
+      let response;
+      switch (selectedTemplate.whatsappTemplate) {
+        case 'order_ready':
+          response = await whatsappService.sendOrderReady(
+            previewData.phone,
+            previewData.customerName,
+            previewData.orderNumber,
+            parseFloat(previewData.amount)
+          );
+          break;
+        case 'appointment_reminder':
+          response = await whatsappService.sendAppointmentReminder(
+            previewData.phone,
+            previewData.customerName,
+            previewData.time,
+            previewData.itemType
+          );
+          break;
+        case 'promotion':
+          response = await whatsappService.sendPromotion(
+            previewData.phone,
+            previewData.customerName,
+            previewData.discount,
+            previewData.validUntil
+          );
+          break;
+        default:
+          alert('Invalid template type');
+          return;
+      }
+
+      if (response.success) {
+        alert('Message sent successfully!');
+        // Add to message history
+        const newMessage: MessageHistory = {
+          id: Date.now().toString(),
+          templateId: selectedTemplate.id,
+          customerName: previewData.customerName,
+          content: getPreviewContent(),
+          sentAt: new Date().toISOString(),
+          status: 'delivered'
+        };
+        setMessageHistory(prev => [newMessage, ...prev]);
+      } else {
+        throw new Error('Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="flex justify-between items-center mb-8">
@@ -134,6 +200,13 @@ export default function MessagePage() {
           <p className="text-gray-400">Manage customer communications</p>
         </div>
         <div className="flex space-x-4">
+          <button 
+            className="btn-bevel accent-secondary px-6 py-3 rounded-lg flex items-center"
+            onClick={() => setShowConfig(!showConfig)}
+          >
+            <MessageSquare className="h-5 w-5 mr-2" />
+            WhatsApp Settings
+          </button>
           <button 
             className="btn-bevel accent-primary px-6 py-3 rounded-lg flex items-center"
             onClick={() => setShowHistory(false)}
@@ -151,7 +224,9 @@ export default function MessagePage() {
         </div>
       </div>
 
-      {showHistory ? (
+      {showConfig ? (
+        <WhatsAppConfig />
+      ) : showHistory ? (
         // Message History View
         <div className="card-bevel p-6">
           <div className="space-y-4">
@@ -299,10 +374,23 @@ export default function MessagePage() {
                     </div>
                   </div>
 
-                  <div className="flex justify-end">
-                    <button className="btn-bevel accent-primary px-6 py-2 rounded-lg flex items-center">
+                  <div className="flex justify-end space-x-4">
+                    <button 
+                      className="btn-bevel accent-secondary px-6 py-2 rounded-lg flex items-center"
+                      onClick={() => {
+                        // Preview message in a modal or alert
+                        alert(getPreviewContent());
+                      }}
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Preview
+                    </button>
+                    <button 
+                      className="btn-bevel accent-primary px-6 py-2 rounded-lg flex items-center"
+                      onClick={handleSendMessage}
+                    >
                       <Send className="h-4 w-4 mr-2" />
-                      Send Message
+                      Send via WhatsApp
                     </button>
                   </div>
                 </div>

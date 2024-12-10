@@ -2,8 +2,11 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Initialize database
-const db = new Database(path.join(process.cwd(), 'server/shoerepair.db'));
+const db = new Database(path.join(__dirname, 'database.db'));
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
@@ -82,6 +85,22 @@ db.exec(`
     updated_at TEXT,
     FOREIGN KEY (operation_shoe_id) REFERENCES operation_shoes (id),
     FOREIGN KEY (service_id) REFERENCES services (id)
+  );
+
+  -- Inventory Items table
+  CREATE TABLE IF NOT EXISTS inventory_items (
+    id TEXT PRIMARY KEY,
+    item_no TEXT NOT NULL UNIQUE,
+    category TEXT NOT NULL,
+    vendor TEXT NOT NULL,
+    upc_sku TEXT NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    location TEXT NOT NULL,
+    cost REAL NOT NULL DEFAULT 0,
+    on_hand INTEGER NOT NULL DEFAULT 0,
+    min_stock INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT,
+    updated_at TEXT
   );
 `);
 

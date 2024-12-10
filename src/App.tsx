@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import StorePage from './pages/StorePage';
 import CustomerPage from './pages/CustomerPage';
 import DropPage from './pages/DropPage';
@@ -8,15 +9,18 @@ import PickupPage from './pages/PickupPage';
 import MessagePage from './pages/MessagePage';
 import OperationPage from './pages/OperationPage';
 import SuppliesPage from './pages/SuppliesPage';
-import SalesItemsPage from './pages/SalesItemsPage';
+import SalesItems from './pages/SalesItems';
 import TicketsPage from './pages/TicketsPage';
 import QRCodesPage from './pages/QRCodesPage';
 import MarketingPage from './pages/MarketingPage';
 import ReportsPage from './pages/ReportsPage';
+import StaffPage from './pages/StaffPage';
+import AdminPage from './pages/AdminPage';
 import MainMenu from './components/MainMenu';
 import RightSidebar from './components/RightSidebar';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { OperationProvider } from './contexts/OperationContext';
+import { AdminProvider } from './contexts/AdminContext';
 
 function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -32,6 +36,12 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-800 text-white">
+      <Toaster position="top-right" toastOptions={{
+        style: {
+          background: '#333',
+          color: '#fff',
+        },
+      }} />
       <div className="flex">
         {/* Left Sidebar */}
         <div className={`${isSidebarCollapsed ? 'w-16' : 'w-72'} min-h-screen bg-gray-900 p-4 relative transition-all duration-300`}>
@@ -63,21 +73,28 @@ function App() {
 
         {/* Main Content */}
         <div className="flex-1 max-h-screen overflow-auto">
-          <Routes>
-            <Route path="/" element={<StorePage />} />
-            <Route path="/store" element={<StorePage />} />
-            <Route path="/customer" element={<CustomerPage />} />
-            <Route path="/drop" element={<DropPage />} />
-            <Route path="/pickup" element={<PickupPage />} />
-            <Route path="/message" element={<MessagePage />} />
-            <Route path="/operation" element={<OperationPage />} />
-            <Route path="/supplies" element={<SuppliesPage />} />
-            <Route path="/salesItems" element={<SalesItemsPage />} />
-            <Route path="/tickets" element={<TicketsPage />} />
-            <Route path="/qrcodes" element={<QRCodesPage />} />
-            <Route path="/marketing" element={<MarketingPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-          </Routes>
+          <CustomerProvider>
+            <OperationProvider>
+              <AdminProvider>
+                <Routes>
+                  <Route path="/" element={<StorePage />} />
+                  <Route path="/customers" element={<CustomerPage />} />
+                  <Route path="/drop" element={<DropPage />} />
+                  <Route path="/pickup" element={<PickupPage />} />
+                  <Route path="/messages" element={<MessagePage />} />
+                  <Route path="/operations" element={<OperationPage />} />
+                  <Route path="/supplies" element={<SuppliesPage />} />
+                  <Route path="/sales" element={<SalesItems />} />
+                  <Route path="/tickets" element={<TicketsPage />} />
+                  <Route path="/qrcodes" element={<QRCodesPage />} />
+                  <Route path="/marketing" element={<MarketingPage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/staff" element={<StaffPage />} />
+                  <Route path="/admin" element={<AdminPage />} />
+                </Routes>
+              </AdminProvider>
+            </OperationProvider>
+          </CustomerProvider>
         </div>
 
         {/* Right Sidebar */}
@@ -97,11 +114,7 @@ function App() {
 
 function AppWithProviders() {
   return (
-    <CustomerProvider>
-      <OperationProvider>
-        <App />
-      </OperationProvider>
-    </CustomerProvider>
+    <App />
   );
 }
 

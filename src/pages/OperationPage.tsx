@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Filter, Search, Package, DollarSign } from 'lucide-react';
+import { Calendar, Clock, Filter, Search, Package, DollarSign, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useOperation } from '../contexts/OperationContext';
 import { format } from 'date-fns';
@@ -7,10 +7,11 @@ import { format } from 'date-fns';
 export default function OperationPage() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'tomorrow' | 'all'>('today');
   const [searchQuery, setSearchQuery] = useState('');
-  const { operations } = useOperation();
+  const { operations, updateOperation } = useOperation();
 
   // Convert operations to work items
   const workItems = operations.map(operation => ({
+    id: operation.id,
     ticketNo: `TKT-${operation.id.slice(-6).toUpperCase()}`,
     custNo: operation.customer?.id ? `CST-${operation.customer.id.slice(-6).toUpperCase()}` : 'N/A',
     name: operation.customer?.name || 'Unknown',
@@ -50,6 +51,18 @@ export default function OperationPage() {
         return true;
     }
   });
+
+  const handleCompleteJob = async (operationId: string) => {
+    try {
+      await updateOperation(operationId, {
+        status: 'completed',
+        isPickup: true,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Failed to complete job:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -199,9 +212,20 @@ export default function OperationPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button className="text-indigo-400 hover:text-indigo-300">
-                    View Details
-                  </button>
+                  <div className="flex items-center justify-end space-x-2">
+                    <button className="text-indigo-400 hover:text-indigo-300">
+                      View Details
+                    </button>
+                    {item.status !== 'completed' && (
+                      <button
+                        onClick={() => handleCompleteJob(item.id)}
+                        className="flex items-center text-emerald-400 hover:text-emerald-300"
+                      >
+                        <CheckCircle className="h-5 w-5 mr-1" />
+                        Complete
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

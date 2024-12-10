@@ -11,7 +11,9 @@ import {
   Tag,
   QrCode,
   Megaphone,
-  BarChart3
+  BarChart3,
+  UserCog,
+  Shield
 } from 'lucide-react';
 
 interface MainMenuProps {
@@ -22,18 +24,20 @@ interface MainMenuProps {
 
 export default function MainMenu({ onMenuClick, currentView, isCollapsed }: MainMenuProps) {
   const menuItems = [
-    { icon: Store, label: 'Store', view: 'store' },
-    { icon: Users, label: 'Customer', view: 'customer' },
+    { icon: Store, label: 'Store', view: '/' },
+    { icon: Users, label: 'Customer', view: 'customers' },
     { icon: Download, label: 'Drop', view: 'drop' },
     { icon: Upload, label: 'Pickup', view: 'pickup' },
-    { icon: MessageSquare, label: 'Messages', view: 'message' },
-    { icon: Settings, label: 'Operation', view: 'operation' },
+    { icon: MessageSquare, label: 'Messages', view: 'messages' },
+    { icon: Settings, label: 'Operation', view: 'operations' },
     { icon: Package, label: 'Supplies', view: 'supplies' },
-    { icon: ShoppingBag, label: 'Sales Items', view: 'salesItems' },
+    { icon: ShoppingBag, label: 'Sales Items', view: 'sales' },
     { icon: Tag, label: 'Tickets & Tags', view: 'tickets' },
-    { icon: QrCode, label: 'QR Codes', view: 'qrCodes' },
+    { icon: QrCode, label: 'QR Codes', view: 'qrcodes' },
     { icon: Megaphone, label: 'Marketing', view: 'marketing' },
-    { icon: BarChart3, label: 'Reports', view: 'reports' }
+    { icon: BarChart3, label: 'Reports', view: 'reports' },
+    { icon: UserCog, label: 'Staff', view: 'staff' },
+    { icon: Shield, label: 'Admin', view: 'admin' }
   ];
 
   const isActive = (view: string) => 

@@ -1,198 +1,243 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Copy, Printer, ShoppingCart, Search, List, X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
 
 interface SupplyItem {
-  itemNo: string;
+  id: string;
+  item_no: string;
   vendor: string;
-  upcSku: string;
+  upc_sku: string;
   description: string;
   location: string;
   cost: number;
-  onHand: number;
-  minStock: number;
+  on_hand: number;
+  min_stock: number;
+  category: string;
 }
 
-interface Category {
-  name: string;
-  items: SupplyItem[];
-}
+const categories = [
+  'Buckles',
+  'Cleaners',
+  'Dowel Tubes',
+  'Dye',
+  'Elastics',
+  'Glue & Thinner',
+  'Heels',
+  'Insoles - Pads & Sock Lining',
+  'Leather & Rubber',
+  'Nails',
+  'Needles',
+  'Rivets',
+  'Sand Paper',
+  'Shanks'
+];
 
 export default function SuppliesPage() {
-  const [activeTab, setActiveTab] = useState<'retail' | 'supplies' | 'raw' | 'tools' | 'others'>('supplies');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Glue & Thinner');
+  const [activeTab, setActiveTab] = useState<string>('Glue & Thinner');
+  const [items, setItems] = useState<SupplyItem[]>([]);
+  const [selectedItem, setSelectedItem] = useState<SupplyItem | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const categories: Category[] = [
-    { name: 'Buckles', items: [] },
-    { name: 'Cleaners', items: [] },
-    { name: 'Dowel Tubes', items: [] },
-    { name: 'Dye', items: [] },
-    { name: 'Elastics', items: [] },
-    { name: 'Glue & Thinner', items: [
-      { itemNo: '', vendor: '', upcSku: '', description: 'Cement', location: '', cost: 0, onHand: 0, minStock: 0 },
-      { itemNo: '', vendor: '', upcSku: '', description: 'Fast Fix Activator', location: '', cost: 0, onHand: 0, minStock: 0 },
-      { itemNo: '', vendor: '', upcSku: '', description: 'Five Star Super Glue', location: '', cost: 0, onHand: 0, minStock: 0 },
-      { itemNo: '', vendor: '', upcSku: '', description: 'Thinner', location: '', cost: 0, onHand: 0, minStock: 0 }
-    ] },
-    { name: 'Heels', items: [] },
-    { name: 'Insoles - Pads & Sock Lining', items: [] },
-    { name: 'Leather & Rubber', items: [] },
-    { name: 'Nails', items: [] },
-    { name: 'Needles', items: [] },
-    { name: 'Rivets', items: [] },
-    { name: 'Sand Paper', items: [] },
-    { name: 'Shanks', items: [] }
-  ];
+  useEffect(() => {
+    fetchItems();
+  }, [activeTab]);
+
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/inventory?category=${activeTab.toLowerCase()}`);
+      const itemsData = Array.isArray(response.data) ? response.data : [];
+      setItems(itemsData);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching items:', err);
+      setError('Failed to fetch inventory items');
+      toast.error('Failed to fetch inventory items');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-800">
-      {/* Top Navigation */}
-      <div className="flex space-x-1 p-2 bg-gray-700">
-        <button 
-          className={`btn-bevel px-6 py-2 rounded ${activeTab === 'retail' ? 'bg-emerald-700' : 'bg-gray-600'}`}
-          onClick={() => setActiveTab('retail')}
-        >
-          Retail Items
-        </button>
-        <button 
-          className={`btn-bevel px-6 py-2 rounded ${activeTab === 'supplies' ? 'bg-emerald-700' : 'bg-gray-600'}`}
-          onClick={() => setActiveTab('supplies')}
-        >
-          Supplies
-        </button>
-        <button 
-          className={`btn-bevel px-6 py-2 rounded ${activeTab === 'raw' ? 'bg-emerald-700' : 'bg-gray-600'}`}
-          onClick={() => setActiveTab('raw')}
-        >
-          Raw Materials
-        </button>
-        <button 
-          className={`btn-bevel px-6 py-2 rounded ${activeTab === 'tools' ? 'bg-emerald-700' : 'bg-gray-600'}`}
-          onClick={() => setActiveTab('tools')}
-        >
-          Tools
-        </button>
-        <button 
-          className={`btn-bevel px-6 py-2 rounded ${activeTab === 'others' ? 'bg-emerald-700' : 'bg-gray-600'}`}
-          onClick={() => setActiveTab('others')}
-        >
-          Others
-        </button>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 p-6">
+      {/* Header with Search */}
+      <div className="flex flex-col space-y-6 mb-8">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-white">Supplies</h1>
+            <p className="text-gray-400 mt-1">Manage inventory and stock levels</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search items..."
+                className="w-64 px-4 py-2 pl-10 bg-gray-800/50 border border-gray-700 rounded-xl focus:outline-none focus:border-indigo-500 text-gray-300"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+            </div>
+            <button className="btn-bevel accent-primary px-6 py-2 rounded-xl flex items-center gap-2 transform hover:scale-105 transition-all">
+              <Plus className="h-5 w-5" />
+              Add New Item
+            </button>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-4 gap-4">
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+            <div className="text-gray-400 text-sm">Total Items</div>
+            <div className="text-2xl font-bold text-white mt-1">{items.length}</div>
+          </div>
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+            <div className="text-gray-400 text-sm">Low Stock Items</div>
+            <div className="text-2xl font-bold text-red-400 mt-1">
+              {items.filter(item => item.on_hand <= item.min_stock).length}
+            </div>
+          </div>
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+            <div className="text-gray-400 text-sm">Total Value</div>
+            <div className="text-2xl font-bold text-green-400 mt-1">
+              ${items.reduce((sum, item) => sum + item.cost * item.on_hand, 0).toFixed(2)}
+            </div>
+          </div>
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+            <div className="text-gray-400 text-sm">Categories</div>
+            <div className="text-2xl font-bold text-indigo-400 mt-1">{categories.length}</div>
+          </div>
+        </div>
       </div>
 
-      <div className="flex h-[calc(100vh-120px)]">
+      <div className="flex gap-6">
         {/* Left Sidebar - Categories */}
-        <div className="w-64 bg-gray-700 p-2">
-          <div className="font-medium mb-2 px-2">Main Item</div>
-          <div className="space-y-0.5 max-h-[calc(100vh-200px)] overflow-y-auto">
-            {categories.map((category) => (
-              <button
-                key={category.name}
-                onClick={() => setSelectedCategory(category.name)}
-                className={`w-full text-left px-2 py-1.5 rounded ${
-                  selectedCategory === category.name ? 'bg-gray-600' : 'hover:bg-gray-600'
-                }`}
-              >
-                {category.name}
+        <div className="w-64 space-y-4">
+          <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-white">Categories</h2>
+              <button className="p-1 hover:bg-gray-700 rounded">
+                <List className="h-4 w-4 text-gray-400" />
               </button>
-            ))}
+            </div>
+            <div className="space-y-1">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setActiveTab(category)}
+                  className={`w-full text-left p-2.5 rounded-lg text-sm transition-all
+                    ${activeTab === category 
+                      ? 'bg-indigo-600 text-white shadow-lg' 
+                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-4">
-          <div className="bg-gray-700 rounded-lg p-4">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-800">
-                  <th className="px-4 py-2 text-left">Item No</th>
-                  <th className="px-4 py-2 text-left">Vendor</th>
-                  <th className="px-4 py-2 text-left">UPC/SKU</th>
-                  <th className="px-4 py-2 text-left">Description</th>
-                  <th className="px-4 py-2 text-left">Location</th>
-                  <th className="px-4 py-2 text-right">Cost</th>
-                  <th className="px-4 py-2 text-right">On Hand</th>
-                  <th className="px-4 py-2 text-right">Min Stock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categories.find(c => c.name === selectedCategory)?.items.map((item, index) => (
-                  <tr key={index} className={index % 2 === 1 ? 'bg-green-100/10' : ''}>
-                    <td className="px-4 py-2">{item.itemNo}</td>
-                    <td className="px-4 py-2">{item.vendor}</td>
-                    <td className="px-4 py-2">{item.upcSku}</td>
-                    <td className="px-4 py-2">{item.description}</td>
-                    <td className="px-4 py-2">{item.location}</td>
-                    <td className="px-4 py-2 text-right">{item.cost}</td>
-                    <td className="px-4 py-2 text-right">{item.onHand}</td>
-                    <td className="px-4 py-2 text-right">{item.minStock}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-gray-400">Loading...</div>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-red-500">{error}</div>
+            </div>
+          ) : (
+            <div className="bg-gray-800/50 rounded-xl border border-gray-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gray-800">
+                      <th className="p-4 text-left text-gray-400 font-medium">Item No</th>
+                      <th className="p-4 text-left text-gray-400 font-medium">Vendor</th>
+                      <th className="p-4 text-left text-gray-400 font-medium">UPC/SKU</th>
+                      <th className="p-4 text-left text-gray-400 font-medium">Description</th>
+                      <th className="p-4 text-left text-gray-400 font-medium">Location</th>
+                      <th className="p-4 text-right text-gray-400 font-medium">Cost</th>
+                      <th className="p-4 text-right text-gray-400 font-medium">On Hand</th>
+                      <th className="p-4 text-right text-gray-400 font-medium">Min Stock</th>
+                      <th className="p-4 text-center text-gray-400 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr 
+                        key={item.id}
+                        onClick={() => setSelectedItem(item)}
+                        className={`border-b border-gray-700 text-gray-300 transition-all
+                          ${selectedItem?.id === item.id 
+                            ? 'bg-indigo-600/10 border-indigo-500/50' 
+                            : 'hover:bg-gray-800/50'
+                          }`}
+                      >
+                        <td className="p-4">{item.item_no}</td>
+                        <td className="p-4">{item.vendor}</td>
+                        <td className="p-4">{item.upc_sku}</td>
+                        <td className="p-4">{item.description}</td>
+                        <td className="p-4">{item.location}</td>
+                        <td className="p-4 text-right">${item.cost.toFixed(2)}</td>
+                        <td className="p-4 text-right">
+                          <span className={`px-2 py-1 rounded-full text-sm
+                            ${item.on_hand <= item.min_stock 
+                              ? 'bg-red-500/20 text-red-400' 
+                              : 'bg-green-500/20 text-green-400'
+                            }`}>
+                            {item.on_hand}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">{item.min_stock}</td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-center space-x-2">
+                            <button className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors">
+                              <Edit2 className="h-4 w-4 text-gray-400" />
+                            </button>
+                            <button className="p-1.5 hover:bg-gray-700 rounded-lg transition-colors">
+                              <Copy className="h-4 w-4 text-gray-400" />
+                            </button>
+                            <button className="p-1.5 hover:bg-red-900/50 rounded-lg transition-colors">
+                              <Trash2 className="h-4 w-4 text-red-400" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Bottom Action Bar */}
+          <div className="mt-4 flex items-center justify-between bg-gray-800/50 p-3 rounded-xl border border-gray-700">
+            <div className="flex items-center space-x-2">
+              <button className="btn-bevel accent-primary px-4 py-2 rounded-lg flex items-center gap-2">
+                <ShoppingCart className="h-4 w-4" />
+                Add to Cart
+              </button>
+              <button className="btn-bevel accent-secondary px-4 py-2 rounded-lg flex items-center gap-2">
+                <Printer className="h-4 w-4" />
+                Print List
+              </button>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button className="btn-bevel accent-secondary px-4 py-2 rounded-lg flex items-center gap-2">
+                <List className="h-4 w-4" />
+                Export
+              </button>
+              <button className="btn-bevel accent-danger px-4 py-2 rounded-lg flex items-center gap-2">
+                <X className="h-4 w-4" />
+                Close
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Right Sidebar - Actions */}
-        <div className="w-32 bg-gray-700 p-2 space-y-2">
-          <button className="btn-bevel bg-amber-600 w-full p-2 rounded text-center">
-            Cost
-          </button>
-          <button className="btn-bevel bg-amber-600 w-full p-2 rounded text-center">
-            Minimum Stock
-          </button>
-          <button className="btn-bevel bg-amber-600 w-full p-2 rounded text-center">
-            Add Stock
-          </button>
-          <button className="btn-bevel bg-gray-600 w-full p-2 rounded text-center">
-            Export
-          </button>
-        </div>
-      </div>
-
-      {/* Bottom Action Bar */}
-      <div className="h-16 bg-gray-900 flex items-center justify-between px-4">
-        <div className="flex space-x-2">
-          <button className="btn-bevel bg-green-700 px-4 py-2 rounded flex items-center">
-            <Plus className="h-5 w-5 mr-2" />
-            Add Item
-          </button>
-          <button className="btn-bevel bg-blue-700 px-4 py-2 rounded flex items-center">
-            <Edit2 className="h-5 w-5 mr-2" />
-            Edit Item
-          </button>
-          <button className="btn-bevel bg-red-700 px-4 py-2 rounded flex items-center">
-            <Trash2 className="h-5 w-5 mr-2" />
-            Delete Item
-          </button>
-          <button className="btn-bevel bg-purple-700 px-4 py-2 rounded flex items-center">
-            <Copy className="h-5 w-5 mr-2" />
-            Copy Item
-          </button>
-          <button className="btn-bevel bg-cyan-700 px-4 py-2 rounded flex items-center">
-            <Printer className="h-5 w-5 mr-2" />
-            Print Label
-          </button>
-          <button className="btn-bevel bg-yellow-700 px-4 py-2 rounded flex items-center">
-            <ShoppingCart className="h-5 w-5 mr-2" />
-            Add to Cart
-          </button>
-          <button className="btn-bevel bg-indigo-700 px-4 py-2 rounded flex items-center">
-            <Search className="h-5 w-5 mr-2" />
-            Search Item
-          </button>
-          <button className="btn-bevel bg-gray-700 px-4 py-2 rounded flex items-center">
-            <List className="h-5 w-5 mr-2" />
-            Print List
-          </button>
-          <button className="btn-bevel bg-orange-700 px-4 py-2 rounded flex items-center">
-            <Copy className="h-5 w-5 mr-2" />
-            Copy Items
-          </button>
-        </div>
-        <button className="btn-bevel bg-green-700 px-4 py-2 rounded flex items-center">
-          <X className="h-5 w-5 mr-2" />
-          Close
-        </button>
       </div>
     </div>
   );
