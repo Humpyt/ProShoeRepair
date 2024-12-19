@@ -159,7 +159,7 @@ export default function TicketsPage() {
               ]}
               readyDate={new Date(selectedTicket.estimatedCompletion)}
               storeInfo={{
-                name: "Arbelsoft Inc",
+                name: "Repair Pro",
                 address: "454 Main St Suite 6, Fort Lee NJ 07024",
                 phone: "(201) 555-1212"
               }}
