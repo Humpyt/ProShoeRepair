@@ -23,7 +23,7 @@ class WhatsAppService {
     // Remove any non-digit characters
     const cleaned = phone.replace(/\D/g, '');
     // Add country code if not present
-    return cleaned.startsWith('1') ? cleaned : `1${cleaned}`;
+    return cleaned.startsWith('256') ? cleaned : `256${cleaned}`;
   }
 
   private async sendRequest(endpoint: string, data: any): Promise<WhatsAppMessageResponse> {

@@ -24,7 +24,10 @@ import {
   faCogs,
   faArrowTrendUp,
   faUsers,
-  faCircleNotch
+  faCircleNotch,
+  faDollarSign,
+  faBell,
+  faEnvelope
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function StorePage() {
@@ -61,7 +64,7 @@ export default function StorePage() {
       label: 'Daily Revenue', 
       value: '$2,845', 
       trend: '+12.5%', 
-      icon: faArrowTrendUp, 
+      icon: faDollarSign, 
       color: '#4CAF50',
       details: 'Based on today\'s transactions'
     },
@@ -84,7 +87,7 @@ export default function StorePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 p-8">
+    <div className="h-screen bg-gradient-to-b from-gray-900 to-gray-800 p-8 overflow-y-auto">
       {/* Top Bar with Stats */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-6">
@@ -115,10 +118,10 @@ export default function StorePage() {
                   <p className="text-gray-500 text-xs mt-2">{stat.details}</p>
                 </div>
                 <div 
-                  className="bg-opacity-20 rounded-xl p-3 group-hover:scale-110 transition-transform" 
+                  className="bg-opacity-20 rounded-xl p-3 group-hover:scale-110 transition-transform flex items-center justify-center" 
                   style={{ backgroundColor: stat.color }}
                 >
-                  <FontAwesomeIcon icon={stat.icon} className="text-2xl" style={{ color: stat.color }} />
+                  <FontAwesomeIcon icon={stat.icon} className="text-2xl text-white" />
                 </div>
               </div>
               <div className="mt-4 flex items-center text-sm">
@@ -133,15 +136,16 @@ export default function StorePage() {
       {/* Quick Actions */}
       <div className="grid grid-cols-4 gap-4 mb-8">
         {[
-          { icon: faUserTie, label: 'Management', primary: true },
-          { icon: faBullhorn, label: 'Marketing' },
-          { icon: faCalendar, label: 'Schedule' },
-          { icon: faMessage, label: 'Message' }
+          { icon: faTicket, label: 'Tickets', primary: true },
+          { icon: faBullhorn, label: 'Marketing', link: '/marketing' },
+          { icon: faBell, label: 'Notification', link: '/notifications' },
+          { icon: faEnvelope, label: 'Messages', link: '/messages' }
         ].map((action, index) => (
-          <button 
+          <a 
             key={index}
+            href={action.link}
             className={`${
-              action.primary ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-800 hover:bg-gray-700'
+              action.primary ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-800 hover:bg-gray-800'
             } rounded-2xl p-5 flex items-center transition-all duration-300 shadow-lg group backdrop-blur-sm bg-opacity-50 border border-transparent hover:border-indigo-500`}
           >
             <div className="bg-black bg-opacity-20 p-3 rounded-xl mr-4">
@@ -151,7 +155,7 @@ export default function StorePage() {
               />
             </div>
             <span className="text-white font-medium">{action.label}</span>
-          </button>
+          </a>
         ))}
       </div>
 

@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 export default function OperationPage() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'tomorrow' | 'all'>('today');
   const [searchQuery, setSearchQuery] = useState('');
-  const { operations, updateOperation } = useOperation();
+  const { operations } = useOperation();
 
   // Convert operations to work items
   const workItems = operations.map(operation => ({
@@ -52,16 +52,11 @@ export default function OperationPage() {
     }
   });
 
-  const handleCompleteJob = async (operationId: string) => {
-    try {
-      await updateOperation(operationId, {
-        status: 'completed',
-        isPickup: true,
-        updatedAt: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Failed to complete job:', error);
-    }
+  const handleViewDetails = (operationId: string) => {
+    // Implement the logic to view details of the operation
+    console.log(`Viewing details for operation ${operationId}`);
+    // Example: Navigate to a details page
+    window.location.href = `/operations/details/${operationId}`;
   };
 
   return (
@@ -213,18 +208,12 @@ export default function OperationPage() {
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end space-x-2">
-                    <button className="text-indigo-400 hover:text-indigo-300">
+                    <button 
+                      className="text-indigo-400 hover:text-indigo-300"
+                      onClick={() => handleViewDetails(item.id)}
+                    >
                       View Details
                     </button>
-                    {item.status !== 'completed' && (
-                      <button
-                        onClick={() => handleCompleteJob(item.id)}
-                        className="flex items-center text-emerald-400 hover:text-emerald-300"
-                      >
-                        <CheckCircle className="h-5 w-5 mr-1" />
-                        Complete
-                      </button>
-                    )}
                   </div>
                 </td>
               </tr>

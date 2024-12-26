@@ -16,6 +16,7 @@ import QRCodesPage from './pages/QRCodesPage';
 import MarketingPage from './pages/MarketingPage';
 import ReportsPage from './pages/ReportsPage';
 import StaffPage from './pages/StaffPage';
+import NotificationsPage from './pages/NotificationsPage';
 import AdminPage from './pages/AdminPage';
 import MainMenu from './components/MainMenu';
 import RightSidebar from './components/RightSidebar';
@@ -91,6 +92,7 @@ function App() {
                   <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/staff" element={<StaffPage />} />
                   <Route path="/admin" element={<AdminPage />} />
+                  <Route path="/notifications" element={<NotificationsPage />} />
                 </Routes>
               </AdminProvider>
             </OperationProvider>

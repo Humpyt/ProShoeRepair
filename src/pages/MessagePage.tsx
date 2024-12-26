@@ -188,6 +188,8 @@ export default function MessagePage() {
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      console.error('Error response:', error.response?.data || error.message);
+      console.error('Error details:', error);
       alert('Failed to send message. Please try again.');
     }
   };

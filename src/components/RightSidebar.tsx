@@ -1,7 +1,10 @@
 import React from 'react';
 import { CustomIcons } from './Icons';
+import { useNavigate } from 'react-router-dom';
 
 export default function RightSidebar() {
+  const navigate = useNavigate();
+
   return (
     <div className="p-4 flex flex-col h-full">
       <div className="space-y-4 flex-1">
@@ -21,7 +24,7 @@ export default function RightSidebar() {
         </button>
       </div>
 
-      <button className="btn-bevel bg-red-600 hover:bg-red-700 w-full p-4 rounded-lg flex flex-col items-center justify-center space-y-2 transition-colors mt-4">
+      <button onClick={() => navigate('/login')} className="btn-bevel bg-red-600 hover:bg-red-700 w-full p-4 rounded-lg flex flex-col items-center justify-center space-y-2 transition-colors mt-4">
         <CustomIcons.Exit />
         <span className="text-sm">Exit</span>
       </button>

@@ -112,4 +112,22 @@ router.post('/', (req, res) => {
   }
 });
 
+// Login route
+router.post('/login', (req, res) => {
+  const { email, password } = req.body;
+  // Mock user data
+  const users = [
+    { email: 'user1@example.com', password: '1234' },
+    { email: 'user2@example.com', password: '1234' }
+  ];
+
+  const user = users.find(u => u.email === email && u.password === password);
+
+  if (user) {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false });
+  }
+});
+
 export default router;

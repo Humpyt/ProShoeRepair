@@ -287,6 +287,7 @@ export default function DropPage() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [activeCartButtons, setActiveCartButtons] = useState<string[]>([]);
 
   const filteredCustomers = customers.filter(customer => 
     customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
@@ -387,27 +388,15 @@ export default function DropPage() {
     }
 
     try {
-      console.log('Submitting operation with data:', {
-        customer: selectedCustomer,
-        shoes: shoes,
-        status: 'pending',
-        totalAmount: calculateTotal(),
-        isNoCharge: false,
-        isDoOver: false,
-        isDelivery: false,
-        isPickup: false,
-        notes: '',
-      });
-
       const operationData = {
         customer: selectedCustomer,
         shoes: shoes,
         status: 'pending' as const,
         totalAmount: calculateTotal(),
-        isNoCharge: false,
-        isDoOver: false,
-        isDelivery: false,
-        isPickup: false,
+        isNoCharge: activeCartButtons.includes('noCharge'),
+        isDoOver: activeCartButtons.includes('doOver'),
+        isDelivery: activeCartButtons.includes('delivery'),
+        isPickup: activeCartButtons.includes('pickup'),
         notes: '',
       };
 
@@ -635,6 +624,20 @@ export default function DropPage() {
       setSelectedColor(null);
       setSelectedServices([]);
     }
+  };
+
+  const toggleCartButton = (buttonName: string) => {
+    setActiveCartButtons(prevState => {
+      if (buttonName === 'pickup' && prevState.includes('delivery')) {
+        return prevState.filter(name => name !== 'delivery').concat(buttonName);
+      } else if (buttonName === 'delivery' && prevState.includes('pickup')) {
+        return prevState.filter(name => name !== 'pickup').concat(buttonName);
+      } else if (prevState.includes(buttonName)) {
+        return prevState.filter(name => name !== buttonName);
+      } else {
+        return [...prevState, buttonName];
+      }
+    });
   };
 
   return (
@@ -933,43 +936,42 @@ export default function DropPage() {
               <div className="mt-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={handleNoCharge}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                    onClick={() => toggleCartButton('noCharge')}
+                    className={`p-2 rounded-lg ${activeCartButtons.includes('noCharge') ? 'bg-purple-700 text-white' : 'bg-purple-500 text-gray-200'} hover:bg-purple-600 transition-colors`}
                   >
                     No Charge
                   </button>
                   <button
-                    onClick={handleDoOver}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                    onClick={() => toggleCartButton('doOver')}
+                    className={`p-2 rounded-lg ${activeCartButtons.includes('doOver') ? 'bg-blue-700 text-white' : 'bg-blue-500 text-gray-200'} hover:bg-blue-600 transition-colors`}
                   >
                     Do Over
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={handleDelivery}
-                    className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                    onClick={() => toggleCartButton('delivery')}
+                    className={`p-2 rounded-lg ${activeCartButtons.includes('delivery') ? 'bg-orange-700 text-white' : 'bg-orange-500 text-gray-200'} hover:bg-orange-600 transition-colors`}
                   >
                     Delivery
                   </button>
                   <button
-                    onClick={handlePickup}
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                    onClick={() => toggleCartButton('pickup')}
+                    className={`p-2 rounded-lg ${activeCartButtons.includes('pickup') ? 'bg-teal-700 text-white' : 'bg-teal-500 text-gray-200'} hover:bg-teal-600 transition-colors`}
                   >
                     Pickup
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <button
-                    onClick={handleDiscount}
-                    className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                    onClick={() => toggleCartButton('discount')}
+                    className={`p-2 rounded-lg ${activeCartButtons.includes('discount') ? 'bg-pink-700 text-white' : 'bg-pink-500 text-gray-200'} hover:bg-pink-600 transition-colors`}
                   >
-                    <Percent size={18} className="mr-2" />
-                    Discount
+                    % Discount
                   </button>
                   <button
-                    onClick={handleSplitTicket}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+                    onClick={() => toggleCartButton('splitTicket')}
+                    className={`p-2 rounded-lg ${activeCartButtons.includes('splitTicket') ? 'bg-indigo-700 text-white' : 'bg-indigo-500 text-gray-200'} hover:bg-indigo-600 transition-colors`}
                   >
                     Split Ticket
                   </button>
