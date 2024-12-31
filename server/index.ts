@@ -7,6 +7,7 @@ import inventoryRouter from './routes/inventory';
 import printerRouter from './routes/printer';
 import salesRoutes from './routes/sales';
 import qrCodesRouter from './routes/qrcodes';
+import suppliesRouter from './routes/supplies';
 import { transformCustomer, transformOperation, transformService } from './utils';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/inventory', inventoryRouter);
 app.use('/api/printer', printerRouter);
 app.use('/api/sales', salesRoutes);
 app.use('/api/qrcodes', qrCodesRouter);
+app.use('/api/supplies', suppliesRouter);
 
 // Customer endpoints
 app.get('/api/customers', (req, res) => {
