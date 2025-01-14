@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Store, 
   Users, 
@@ -18,107 +19,106 @@ import {
 } from 'lucide-react';
 
 interface MainMenuProps {
-  onMenuClick: (view: string) => void;
-  currentView: string;
   isCollapsed: boolean;
 }
 
 interface NavItemProps {
   icon: React.ElementType;
   label: string;
-  onClick: () => void;
+  to: string;
   isActive: boolean;
   isCollapsed: boolean;
 }
 
-const NavItem = ({ icon: Icon, label, onClick, isActive, isCollapsed }: NavItemProps) => (
-  <button 
-    onClick={onClick}
-    title={isCollapsed ? label : undefined}
-    className={`
-      flex items-center px-5 py-2.5 rounded-lg w-full
-      transition-all duration-200
-      ${isActive 
-        ? 'bg-indigo-600 text-white shadow-lg translate-x-1.5' 
-        : 'text-gray-300 hover:bg-indigo-600/20 hover:text-white hover:translate-x-1.5'
-      }
-    `}
-  >
-    <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
-      <Icon className="h-5 w-5" />
-    </div>
-    {!isCollapsed && (
-      <span className="ml-3 text-sm font-medium tracking-wide truncate">
-        {label}
-      </span>
-    )}
-  </button>
-);
+const NavItem = ({ icon: Icon, label, to, isActive, isCollapsed }: NavItemProps) => {
+  const navigate = useNavigate();
+  
+  return (
+    <button 
+      onClick={() => navigate(to)}
+      title={isCollapsed ? label : undefined}
+      className={`
+        flex items-center px-5 py-2.5 rounded-lg w-full
+        transition-all duration-200
+        ${isActive 
+          ? 'bg-indigo-600 text-white shadow-lg translate-x-1.5' 
+          : 'text-gray-300 hover:bg-indigo-600/20 hover:text-white hover:translate-x-1.5'
+        }
+      `}
+    >
+      <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      {!isCollapsed && (
+        <span className="ml-3 text-sm font-medium tracking-wide truncate">
+          {label}
+        </span>
+      )}
+    </button>
+  );
+};
 
 const menuGroups = [
   {
     title: "Main",
     items: [
-      { icon: Store, label: 'Store', view: '/' },
-      { icon: Download, label: 'Drop', view: 'drop' },
-      { icon: Upload, label: 'Pickup', view: 'pickup' },
-      { icon: MessageSquare, label: 'Messages', view: 'messages' },
+      { icon: Store, label: "Store", path: "/" },
+      { icon: Users, label: "Customers", path: "/customers" },
+      { icon: Download, label: "Drop", path: "/drop" },
+      { icon: Upload, label: "Pickup", path: "/pickup" },
+      { icon: MessageSquare, label: "Messages", path: "/messages" },
     ]
   },
   {
     title: "Management",
     items: [
-      { icon: Users, label: 'Customer', view: 'customers' },
-      { icon: Settings, label: 'Operation', view: 'operations' },
-      { icon: UserCog, label: 'Staff', view: 'staff' },
+      { icon: Settings, label: "Operation", path: "/operation" },
+      { icon: Package, label: "Supplies", path: "/supplies" },
+      { icon: ShoppingBag, label: "Sales", path: "/sales" },
+      { icon: Tag, label: "Sales Items", path: "/sales-items" },
+      { icon: QrCode, label: "QR Codes", path: "/qrcodes" },
     ]
   },
   {
-    title: "Sales",
+    title: "Business",
     items: [
-      { icon: Package, label: 'Supplies', view: 'supplies' },
-      { icon: DollarSign, label: 'Sales Overview', view: 'sales' },
-      { icon: ShoppingBag, label: 'Sales Items', view: 'sales-items' },
-    ]
-  },
-  {
-    title: "Tools",
-    items: [
-      { icon: Tag, label: 'Tickets & Tags', view: 'tickets' },
-      { icon: QrCode, label: 'QR Codes', view: 'qrcodes' },
-      { icon: Megaphone, label: 'Marketing', view: 'marketing' },
-      { icon: BarChart3, label: 'Reports', view: 'reports' },
-      { icon: Shield, label: 'Admin', view: 'admin' },
+      { icon: Megaphone, label: "Marketing", path: "/marketing" },
+      { icon: BarChart3, label: "Reports", path: "/reports" },
+      { icon: UserCog, label: "Staff", path: "/staff" },
+      { icon: Shield, label: "Admin", path: "/admin" },
     ]
   }
 ];
 
-export default function MainMenu({ onMenuClick, currentView, isCollapsed }: MainMenuProps) {
+const MainMenu: React.FC<MainMenuProps> = ({ isCollapsed }) => {
+  const location = useLocation();
+  const currentPath = location.pathname;
+
   return (
-    <div className="h-full py-4">
-      <div className="space-y-6">
-        {menuGroups.map((group, index) => (
-          <div key={index} className="space-y-1.5">
-            {!isCollapsed && (
-              <h2 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider px-5 mb-2">
-                {group.title}
-              </h2>
-            )}
-            <div className="space-y-1">
-              {group.items.map((item) => (
-                <NavItem
-                  key={item.view}
-                  icon={item.icon}
-                  label={item.label}
-                  onClick={() => onMenuClick(item.view)}
-                  isActive={currentView === item.view}
-                  isCollapsed={isCollapsed}
-                />
-              ))}
-            </div>
+    <nav className="h-full py-4 flex flex-col gap-4">
+      {menuGroups.map((group, groupIndex) => (
+        <div key={groupIndex} className="px-4">
+          {!isCollapsed && (
+            <h2 className="mb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              {group.title}
+            </h2>
+          )}
+          <div className="space-y-1">
+            {group.items.map((item, itemIndex) => (
+              <NavItem
+                key={itemIndex}
+                icon={item.icon}
+                label={item.label}
+                to={item.path}
+                isActive={currentPath === item.path}
+                isCollapsed={isCollapsed}
+              />
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      ))}
+    </nav>
   );
-}
+};
+
+export default MainMenu;

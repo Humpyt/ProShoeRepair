@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { format, differenceInDays } from 'date-fns';
-import type { Customer, Transaction } from '../types';
+import type { Customer, Transaction, Operation } from '../types';
 import { useCustomer } from '../contexts/CustomerContext';
+import { useOperation } from '../contexts/OperationContext';
 
 interface CustomerFormData {
   name: string;
@@ -41,6 +42,7 @@ export default function CustomerPage() {
     loading,
     error 
   } = useCustomer();
+  const { operations } = useOperation();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showCustomerDetails, setShowCustomerDetails] = useState(false);
@@ -49,6 +51,8 @@ export default function CustomerPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [evaluation, setEvaluation] = useState<CustomerEvaluation | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const transactionsPerPage = 3;
   
   const [formData, setFormData] = useState<CustomerFormData>({
     name: '',
@@ -177,59 +181,69 @@ export default function CustomerPage() {
   // Calculate customer evaluation when selected customer changes
   useEffect(() => {
     if (selectedCustomer) {
-      const customerTransactions = [
-        {
-          id: '1',
-          type: 'payment',
-          amount: 150,
-          date: '2024-01-15',
-          description: 'Shoe repair service'
-        },
-        {
-          id: '2',
-          type: 'credit',
-          amount: -50,
-          date: '2024-01-10',
-          description: 'Store credit applied'
-        },
-        {
-          id: '3',
-          type: 'payment',
-          amount: 200,
-          date: '2024-01-05',
-          description: 'Custom shoe modification'
-        }
-      ];
+      // Get customer's operations/transactions
+      const customerOperations = operations.filter(
+        op => op.customer?.id === selectedCustomer.id
+      );
+
+      // Convert operations to transactions
+      const customerTransactions = customerOperations.map(op => ({
+        id: op.id,
+        type: 'payment',
+        amount: op.totalAmount,
+        date: op.createdAt,
+        description: op.shoes.map(shoe => 
+          `${shoe.category} - ${shoe.services.map(s => s.name).join(', ')}`
+        ).join('; ')
+      }));
+
       setTransactions(customerTransactions);
 
-      // Calculate evaluation metrics
-      const evaluation: CustomerEvaluation = {
-        totalRevenue: selectedCustomer.totalSpent,
-        visitFrequency: selectedCustomer.totalOrders / 12, // visits per month
-        lastVisit: selectedCustomer.lastVisit,
-        rank: Math.floor(Math.random() * 100) + 1, // Mock rank
-        totalCustomers: customers.length
-      };
-      setEvaluation(evaluation);
+      // Calculate total spent and orders
+      const totalSpent = customerOperations.reduce((sum, op) => sum + op.totalAmount, 0);
+      const totalOrders = customerOperations.length;
 
-      // Set mock alerts
-      const customerAlerts: Alert[] = [
-        {
+      // Update customer in state only, don't make API call here
+      setSelectedCustomer(prev => prev ? {
+        ...prev,
+        totalSpent,
+        totalOrders
+      } : null);
+
+      // Set alerts based on customer notes
+      const alerts: Alert[] = [];
+      if (selectedCustomer.notes) {
+        alerts.push({
           id: '1',
-          message: 'VIP Customer - Priority Service',
-          priority: 'high',
-          timestamp: new Date().toISOString()
-        },
-        {
-          id: '2',
-          message: 'Birthday coming up in 2 weeks',
+          message: selectedCustomer.notes,
           priority: 'medium',
           timestamp: new Date().toISOString()
-        }
-      ];
-      setAlerts(customerAlerts);
+        });
+      }
+
+      // Pending operations alert
+      const pendingOps = customerOperations.filter(op => op.status === 'pending' || op.status === 'in_progress');
+      if (pendingOps.length > 0) {
+        alerts.push({
+          id: '2',
+          message: `${pendingOps.length} pending repair(s)`,
+          priority: 'high',
+          timestamp: new Date().toISOString()
+        });
+      }
+
+      setAlerts(alerts);
     }
-  }, [selectedCustomer]);
+  }, [selectedCustomer, operations]);
+
+  // Get current transactions for pagination
+  const indexOfLastTransaction = currentPage * transactionsPerPage;
+  const indexOfFirstTransaction = indexOfLastTransaction - transactionsPerPage;
+  const currentTransactions = transactions.slice(indexOfFirstTransaction, indexOfLastTransaction);
+  const totalPages = Math.ceil(transactions.length / transactionsPerPage);
+
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
 
   // Filter customers based on search term
   const filteredCustomers = customers.filter(customer => 
@@ -505,41 +519,53 @@ export default function CustomerPage() {
               </div>
 
               {/* Recent Transactions */}
-              <div>
-                <h3 className="font-semibold mb-3">Recent Transactions</h3>
-                <div className="space-y-2">
-                  {transactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="bg-gray-800 p-3 rounded-lg flex justify-between items-center"
-                    >
-                      <div>
-                        <div className="font-medium">{transaction.description}</div>
-                        <div className="text-sm text-gray-400">
-                          {format(new Date(transaction.date), 'MMM d, yyyy')}
-                        </div>
-                      </div>
-                      <div className={transaction.type === 'credit' ? 'text-red-400' : 'text-green-400'}>
-                        {formatCurrency(transaction.amount)}
-                      </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-indigo-400">Recent Transactions</h3>
+                {currentTransactions.map(transaction => (
+                  <div
+                    key={transaction.id}
+                    className="bg-gray-800 p-4 rounded-lg space-y-2"
+                  >
+                    <p className="text-sm text-gray-300">{transaction.description}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-400">
+                        {format(new Date(transaction.date), 'MMM d, yyyy')}
+                      </span>
+                      <span className={`text-lg font-semibold ${
+                        transaction.type === 'credit' ? 'text-red-400' : 'text-green-400'
+                      }`}>
+                        {transaction.type === 'credit' ? '-' : ''}{formatCurrency(transaction.amount)}
+                      </span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+                
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center space-x-2 mt-4">
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <button
+                        key={i + 1}
+                        onClick={() => paginate(i + 1)}
+                        className={`px-3 py-1 rounded ${
+                          currentPage === i + 1
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Alerts */}
-              {alerts.length > 0 && (
-                <div>
-                  <h3 className="font-semibold mb-3">Alerts</h3>
-                  <div className="space-y-2">
-                    {alerts.map((alert) => (
-                      <div
-                        key={alert.id}
-                        className={`p-3 rounded-lg flex items-center ${getAlertColor(alert.priority)}`}
-                      >
-                        {alert.message}
-                      </div>
-                    ))}
+              {/* Customer Notes */}
+              {selectedCustomer.notes && (
+                <div className="mt-4">
+                  <h3 className="text-lg font-semibold text-indigo-400 mb-2">Notes</h3>
+                  <div className="bg-gray-800 p-4 rounded-lg">
+                    <p className="text-sm text-gray-300">{selectedCustomer.notes}</p>
                   </div>
                 </div>
               )}

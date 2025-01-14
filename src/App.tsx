@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import StorePage from './pages/StorePage';
 import CustomerPage from './pages/CustomerPage';
@@ -20,17 +20,48 @@ import NotificationsPage from './pages/NotificationsPage';
 import AdminPage from './pages/AdminPage';
 import MainMenu from './components/MainMenu';
 import RightSidebar from './components/RightSidebar';
+import QuickActionButtons from './components/QuickActionButtons';
 import { CustomerProvider } from './contexts/CustomerContext';
 import { OperationProvider } from './contexts/OperationContext';
 import { AdminProvider } from './contexts/AdminContext';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import FirestoreTest from './pages/FirestoreTest';
+
+const Layout = ({ isSidebarCollapsed, toggleSidebar }: { isSidebarCollapsed: boolean; toggleSidebar: () => void }) => {
+  return (
+    <div className={`flex h-screen ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {/* Sidebar */}
+      <div
+        className={`bg-gray-900 text-white transition-all duration-300 ease-in-out ${
+          isSidebarCollapsed ? 'w-16' : 'w-64'
+        }`}
+      >
+        <MainMenu isCollapsed={isSidebarCollapsed} />
+      </div>
+
+      {/* Toggle button */}
+      <button
+        onClick={toggleSidebar}
+        className="fixed left-0 top-1/2 transform -translate-y-1/2 bg-gray-800 text-white p-2 rounded-r-md hover:bg-gray-700 focus:outline-none"
+      >
+        {isSidebarCollapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+      </button>
+
+      {/* Main content */}
+      <div className="flex flex-1 overflow-hidden pr-[80px]">
+        <div className="flex-1 overflow-auto">
+          <Outlet />
+        </div>
+        <QuickActionButtons />
+      </div>
+    </div>
+  );
+};
 
 function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const navigate = useNavigate();
-
-  const handleMenuClick = (view: string) => {
-    navigate(view === '/' ? view : `/${view}`);
-  };
 
   const toggleSidebar = () => {
     setIsSidebarCollapsed(!isSidebarCollapsed);
@@ -38,85 +69,62 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-800 text-white">
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/test-firestore" element={<FirestoreTest />} />
+        
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout isSidebarCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
+          </ProtectedRoute>
+        }>
+          <Route index element={<StorePage />} />
+          <Route path="customers" element={<CustomerPage />} />
+          <Route path="drop" element={<DropPage />} />
+          <Route path="pickup" element={<PickupPage />} />
+          <Route path="messages" element={<MessagePage />} />
+          <Route path="operation" element={<OperationPage />} />
+          <Route path="supplies" element={<SuppliesPage />} />
+          <Route path="sales" element={<SalesPage />} />
+          <Route path="sales-items" element={<SalesItems />} />
+          <Route path="tickets" element={<TicketsPage />} />
+          <Route path="qrcodes" element={<QRCodesPage />} />
+          <Route path="marketing" element={<MarketingPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="staff" element={
+            <ProtectedRoute requiredRoles={['admin', 'manager']}>
+              <StaffPage />
+            </ProtectedRoute>
+          } />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="admin" element={
+            <ProtectedRoute requiredRoles={['admin']}>
+              <AdminPage />
+            </ProtectedRoute>
+          } />
+        </Route>
+      </Routes>
       <Toaster position="top-right" toastOptions={{
         style: {
           background: '#333',
           color: '#fff',
         },
       }} />
-      <div className="flex">
-        {/* Left Sidebar */}
-        <div className={`${isSidebarCollapsed ? 'w-12' : 'w-56'} h-screen bg-gray-900 flex flex-col transition-all duration-300`}>
-          {/* Toggle Button */}
-          <button 
-            onClick={toggleSidebar}
-            className="absolute top-3 -right-3 bg-gray-800 text-gray-400 hover:text-white p-1 rounded-full shadow-lg border border-gray-700 z-10"
-          >
-            {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-          </button>
-
-          <div className={`mb-8 ${isSidebarCollapsed ? 'text-center' : ''}`}>
-            <div className={`text-2xl font-bold text-white flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-2'}`}>
-              {!isSidebarCollapsed && <span className="text-emerald-500">Repair</span>}
-              <span className={isSidebarCollapsed ? 'text-emerald-500' : ''}>
-                {isSidebarCollapsed ? 'R' : 'PRO'}
-              </span>
-            </div>
-          </div>
-
-          <MainMenu 
-            onMenuClick={handleMenuClick} 
-            currentView={window.location.pathname}
-            isCollapsed={isSidebarCollapsed}
-          />
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 max-h-screen overflow-auto">
-          <CustomerProvider>
-            <OperationProvider>
-              <AdminProvider>
-                <Routes>
-                  <Route path="/" element={<StorePage />} />
-                  <Route path="/customers" element={<CustomerPage />} />
-                  <Route path="/drop" element={<DropPage />} />
-                  <Route path="/pickup" element={<PickupPage />} />
-                  <Route path="/messages" element={<MessagePage />} />
-                  <Route path="/operations" element={<OperationPage />} />
-                  <Route path="/supplies" element={<SuppliesPage />} />
-                  <Route path="/sales" element={<SalesPage />} />
-                  <Route path="/sales-items" element={<SalesItems />} />
-                  <Route path="/tickets" element={<TicketsPage />} />
-                  <Route path="/qrcodes" element={<QRCodesPage />} />
-                  <Route path="/marketing" element={<MarketingPage />} />
-                  <Route path="/reports" element={<ReportsPage />} />
-                  <Route path="/staff" element={<StaffPage />} />
-                  <Route path="/admin" element={<AdminPage />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                </Routes>
-              </AdminProvider>
-            </OperationProvider>
-          </CustomerProvider>
-        </div>
-
-        {/* Right Sidebar */}
-        <div className="w-48 min-h-screen bg-gray-900">
-          <RightSidebar collapsed={isSidebarCollapsed} />
-          <button
-            onClick={toggleSidebar}
-            className="absolute -left-4 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-1 shadow-md"
-          >
-            {isSidebarCollapsed ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
 
 function AppWithProviders() {
   return (
-    <App />
+    <AuthProvider>
+      <CustomerProvider>
+        <OperationProvider>
+          <AdminProvider>
+            <App />
+          </AdminProvider>
+        </OperationProvider>
+      </CustomerProvider>
+    </AuthProvider>
   );
 }
 
