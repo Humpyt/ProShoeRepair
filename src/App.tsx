@@ -25,9 +25,19 @@ import { CustomerProvider } from './contexts/CustomerContext';
 import { OperationProvider } from './contexts/OperationContext';
 import { AdminProvider } from './contexts/AdminContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { CartProvider } from './contexts/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import FirestoreTest from './pages/FirestoreTest';
+import HoldQuickDropPage from './pages/HoldQuickDropPage';
+import NoChargeDoOverPage from './pages/NoChargeDoOverPage';
+import TicketSearchPage from './pages/TicketSearchPage';
+import AssemblyPage from './pages/AssemblyPage';
+import RackingPage from './pages/RackingPage';
+import PickupOrderPage from './pages/PickupOrderPage';
+import DeliveriesPage from './pages/DeliveriesPage';
+import CodPaymentPage from './pages/CodPaymentPage';
+import SaleItemsPage from './pages/SaleItemsPage';
 
 const Layout = ({ isSidebarCollapsed, toggleSidebar }: { isSidebarCollapsed: boolean; toggleSidebar: () => void }) => {
   return (
@@ -102,6 +112,15 @@ function App() {
               <AdminPage />
             </ProtectedRoute>
           } />
+          <Route path="hold-quick-drop" element={<HoldQuickDropPage />} />
+          <Route path="no-charge-do-over" element={<NoChargeDoOverPage />} />
+          <Route path="ticket-search" element={<TicketSearchPage />} />
+          <Route path="assembly" element={<AssemblyPage />} />
+          <Route path="racking" element={<RackingPage />} />
+          <Route path="pickup-order" element={<PickupOrderPage />} />
+          <Route path="deliveries" element={<DeliveriesPage />} />
+          <Route path="cod-payment" element={<CodPaymentPage />} />
+          <Route path="sale-items" element={<SaleItemsPage />} />
         </Route>
       </Routes>
       <Toaster position="top-right" toastOptions={{
@@ -120,7 +139,9 @@ function AppWithProviders() {
       <CustomerProvider>
         <OperationProvider>
           <AdminProvider>
-            <App />
+            <CartProvider>
+              <App />
+            </CartProvider>
           </AdminProvider>
         </OperationProvider>
       </CustomerProvider>

@@ -1,81 +1,99 @@
 import React from 'react';
-import { Clock, DollarSign, Package, AlertCircle, CreditCard, TrendingUp, Truck, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, DollarSign, Package, AlertCircle, CreditCard, TrendingUp, Truck } from 'lucide-react';
 
 export default function QuickInformation() {
+  const navigate = useNavigate();
+
+  const handleClick = (route: string) => {
+    console.log('Navigating to:', route); // Debug log
+    navigate(route);
+  };
+
   const quickActions = [
     {
       icon: Clock,
       label: 'Hold & Quick drop',
       count: 5,
-      color: 'text-yellow-500'
-    },
-    {
-      icon: AlertCircle,
-      label: 'Tickets Not Ready',
-      count: 12,
-      color: 'text-red-500'
+      color: '#4CAF50',
+      route: '/hold-quick-drop'
     },
     {
       icon: DollarSign,
       label: 'No charge & Do over',
       count: 3,
-      color: 'text-blue-500'
+      color: '#2196F3',
+      route: '/no-charge-do-over'
     },
     {
       icon: Package,
       label: 'Ready by today',
       count: 8,
-      color: 'text-green-500'
+      color: '#00BCD4',
+      route: '/ready-by-today'
     },
     {
       icon: CreditCard,
       label: 'Credit List',
       count: 4,
-      color: 'text-purple-500'
+      color: '#9C27B0',
+      route: '/credit-list'
+    },
+    {
+      icon: AlertCircle,
+      label: 'Overdue',
+      count: 12,
+      color: '#F44336',
+      route: '/overdue'
     },
     {
       icon: Truck,
       label: 'Delivery',
       count: 6,
-      color: 'text-indigo-500'
+      color: '#3F51B5',
+      route: '/delivery'
     },
     {
       icon: TrendingUp,
       label: 'Adjusted payment',
       count: 2,
-      color: 'text-pink-500'
-    },
-    {
-      icon: Search,
-      label: 'Search Orders',
-      color: 'text-cyan-500'
+      color: '#FF9800',
+      route: '/adjusted-payment'
     }
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-3 gap-4">
       {quickActions.map((action, index) => (
         <button
           key={index}
-          className="bg-gray-700 p-4 rounded-lg hover:bg-gray-600 transition-colors"
+          onClick={() => handleClick(action.route)}
+          className="bg-gray-900 hover:bg-gray-800 p-5 rounded-xl text-left transition-all duration-300 group border border-gray-700 hover:border-indigo-500 backdrop-blur-sm bg-opacity-50"
         >
-          <div className="flex items-center justify-between mb-2">
-            <action.icon className={`h-6 w-6 ${action.color}`} />
-            {action.count !== undefined && (
-              <span className={`${action.color} font-semibold`}>
+          <div className="flex justify-between items-center">
+            <div className="flex items-center">
+              <div 
+                className="p-3 rounded-xl mr-4 group-hover:scale-110 transition-transform" 
+                style={{ backgroundColor: `${action.color}20` }}
+              >
+                <action.icon 
+                  className="w-5 h-5" 
+                  style={{ color: action.color }}
+                />
+              </div>
+              <div>
+                <span className="text-white font-medium block">{action.label}</span>
+                <span className="text-gray-500 text-sm">View details</span>
+              </div>
+            </div>
+            {action.count > 0 && (
+              <span 
+                className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-medium group-hover:bg-indigo-500 transition-colors"
+              >
                 {action.count}
               </span>
             )}
           </div>
-          <div className="text-sm font-medium text-gray-200">{action.label}</div>
-          {action.count !== undefined && (
-            <div className="mt-2 w-full bg-gray-600 h-1 rounded-full overflow-hidden">
-              <div 
-                className={`h-full ${action.color.replace('text-', 'bg-')}`}
-                style={{ width: `${(action.count / 12) * 100}%` }}
-              />
-            </div>
-          )}
         </button>
       ))}
     </div>

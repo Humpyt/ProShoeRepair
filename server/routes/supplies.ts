@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const router = express.Router();
 
-// Get supplies by category
+// Get all supplies
 router.get('/', (req, res) => {
   try {
     const { category } = req.query;
@@ -12,7 +12,7 @@ router.get('/', (req, res) => {
     let query = 'SELECT * FROM supplies';
     let params: any[] = [];
     
-    if (category) {
+    if (category && category !== 'all') {
       query += ' WHERE category = ?';
       params.push(category);
     }
@@ -47,17 +47,31 @@ router.get('/:id', (req, res) => {
 // Create a new supply item
 router.post('/', (req, res) => {
   try {
-    const { name, category, description, onHand, minStock, cost, unit } = req.body;
+    const { name, category, price, quantity, image_url } = req.body;
+    
+    // Validate required fields
+    if (!name || !category || price === undefined || quantity === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validate price and quantity
+    if (isNaN(price) || price < 0) {
+      return res.status(400).json({ error: 'Invalid price' });
+    }
+    if (isNaN(quantity) || quantity < 0) {
+      return res.status(400).json({ error: 'Invalid quantity' });
+    }
+
     const now = new Date().toISOString();
     
     const result = db.prepare(`
       INSERT INTO supplies (
-        id, name, category, description, on_hand,
-        min_stock, cost, unit, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, name, category, price, quantity,
+        image_url, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      uuidv4(), name, category, description, onHand,
-      minStock, cost, unit, now, now
+      uuidv4(), name, category, price, quantity,
+      image_url || null, now, now
     );
     
     if (result.changes > 0) {
@@ -76,22 +90,34 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, description, onHand, minStock, cost, unit } = req.body;
+    const { name, category, price, quantity, image_url } = req.body;
+    
+    // Validate required fields
+    if (!name || !category || price === undefined || quantity === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validate price and quantity
+    if (isNaN(price) || price < 0) {
+      return res.status(400).json({ error: 'Invalid price' });
+    }
+    if (isNaN(quantity) || quantity < 0) {
+      return res.status(400).json({ error: 'Invalid quantity' });
+    }
+
     const now = new Date().toISOString();
     
     const result = db.prepare(`
       UPDATE supplies SET
         name = ?,
         category = ?,
-        description = ?,
-        on_hand = ?,
-        min_stock = ?,
-        cost = ?,
-        unit = ?,
+        price = ?,
+        quantity = ?,
+        image_url = ?,
         updated_at = ?
       WHERE id = ?
     `).run(
-      name, category, description, onHand, minStock, cost, unit,
+      name, category, price, quantity, image_url || null,
       now, id
     );
     

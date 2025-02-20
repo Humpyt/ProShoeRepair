@@ -15,7 +15,8 @@ import {
   BarChart3,
   UserCog,
   Shield,
-  DollarSign
+  DollarSign,
+  Clock
 } from 'lucide-react';
 
 interface MainMenuProps {
@@ -62,30 +63,31 @@ const menuGroups = [
   {
     title: "Main",
     items: [
-      { icon: Store, label: "Store", path: "/" },
-      { icon: Users, label: "Customers", path: "/customers" },
-      { icon: Download, label: "Drop", path: "/drop" },
-      { icon: Upload, label: "Pickup", path: "/pickup" },
-      { icon: MessageSquare, label: "Messages", path: "/messages" },
+      { icon: Store, label: "Store", to: "/" },
+      { icon: Users, label: "Customers", to: "/customers" },
+      { icon: Download, label: "Drop", to: "/drop" },
+      { icon: Upload, label: "Pickup", to: "/pickup" },
+      { icon: Clock, label: "Hold & Quick Drop", to: "/hold-quick-drop" },
+      { icon: MessageSquare, label: "Messages", to: "/messages" },
     ]
   },
   {
     title: "Management",
     items: [
-      { icon: Settings, label: "Operation", path: "/operation" },
-      { icon: Package, label: "Supplies", path: "/supplies" },
-      { icon: ShoppingBag, label: "Sales", path: "/sales" },
-      { icon: Tag, label: "Sales Items", path: "/sales-items" },
-      { icon: QrCode, label: "QR Codes", path: "/qrcodes" },
+      { icon: Settings, label: "Operation", to: "/operation" },
+      { icon: Package, label: "Supplies", to: "/supplies" },
+      { icon: ShoppingBag, label: "Sales", to: "/sales" },
+      { icon: Tag, label: "Sales Items", to: "/sales-items" },
+      { icon: QrCode, label: "QR Codes", to: "/qrcodes" },
     ]
   },
   {
     title: "Business",
     items: [
-      { icon: Megaphone, label: "Marketing", path: "/marketing" },
-      { icon: BarChart3, label: "Reports", path: "/reports" },
-      { icon: UserCog, label: "Staff", path: "/staff" },
-      { icon: Shield, label: "Admin", path: "/admin" },
+      { icon: Megaphone, label: "Marketing", to: "/marketing" },
+      { icon: BarChart3, label: "Reports", to: "/reports" },
+      { icon: UserCog, label: "Staff", to: "/staff" },
+      { icon: Shield, label: "Admin", to: "/admin" },
     ]
   }
 ];
@@ -109,8 +111,8 @@ const MainMenu: React.FC<MainMenuProps> = ({ isCollapsed }) => {
                 key={itemIndex}
                 icon={item.icon}
                 label={item.label}
-                to={item.path}
-                isActive={currentPath === item.path}
+                to={item.to}
+                isActive={currentPath === item.to}
                 isCollapsed={isCollapsed}
               />
             ))}
