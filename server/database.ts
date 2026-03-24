@@ -285,13 +285,20 @@ const initializeDatabase = async () => {
   }
 };
 
-// Initialize the database
-initializeDatabase();
+// Initialize the database and seed data
+const initializeDatabaseWithSeed = async () => {
+  await initializeDatabase();
 
-// Seed sample data
-import { seedProductsAndCategories } from './seed-data';
-seedProductsAndCategories().catch(err => {
-  console.error('Failed to seed products and categories:', err);
-});
+  // Seed sample data after initialization
+  try {
+    const { seedProductsAndCategories } = await import('./seed-data');
+    await seedProductsAndCategories();
+  } catch (err) {
+    console.error('Failed to seed products and categories:', err);
+  }
+};
+
+// Start initialization
+initializeDatabaseWithSeed();
 
 export default db as any;
