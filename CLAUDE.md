@@ -23,13 +23,20 @@ npm run dev:server  # Express server on port 3000
 ```bash
 npm run build    # TypeScript compilation + Vite build
 npm run lint     # ESLint with TypeScript rules
+npm run preview  # Preview production build locally
 ```
 
 **Database utilities:**
 ```bash
 npm run init:supplies     # Initialize supplies table
 npm run add:supplies      # Add dummy supply data
-npm run create:admin      # Create admin user script
+```
+
+**Database seeding scripts (run via tsx):**
+```bash
+tsx server/reset_database.ts     # Reset and reinitialize database
+tsx server/add_customers.ts      # Add sample customer data
+tsx server/add_services.ts       # Add sample service data
 ```
 
 ## Architecture
@@ -38,24 +45,35 @@ npm run create:admin      # Create admin user script
 
 - **Entry point:** `server/index.ts` - Express server on port 3000
 - **Database:** SQLite (`server/database.db`) initialized in `server/database.ts`
-- **Router structure:** Modular routers in `server/routes/`:
-  - `operations.ts` - Main router mounted at `/api/operations` (also exported as `server/operations.ts`)
-  - `inventory.ts`, `sales.ts`, `printer.ts`, `qrcodes.ts`, `supplies.ts`, `categories.ts`, `products.ts`
+- **Auto-seeding:** Database automatically seeds default categories, services, and products on first run via `server/seed-data.ts`
+
+**Router structure:** Modular routers in `server/routes/`:
+- `operations.ts` - Main router mounted at `/api/operations` (also at `server/operations.ts`)
+- `inventory.ts` - Inventory management
+- `sales.ts` - Sales endpoints
+- `printer.ts` - Thermal printer integration
+- `qrcodes.ts` - QR code generation
+- `supplies.ts` - Supplies tracking
+- `categories.ts` - Product categories
+- `products.ts` - Product catalog
 
 **Database schema key tables:**
-- `customers` - Customer records with loyalty points
-- `operations` - Repair orders (linked to customers)
+- `customers` - Customer records with loyalty points, total_orders, total_spent
+- `operations` - Repair orders (linked to customers, supports no_charge, do_over, delivery, pickup flags)
 - `operation_shoes` - Individual shoes in an order
 - `operation_services` - Services applied to each shoe
-- `services` - Available services with pricing
+- `services` - Available services with pricing and estimated_days
 - `sales_categories` / `sales_items` - Retail product categories and items
 - `products` / `categories` - Additional product catalog (uses ProductContext)
-
-**Important:** The app uses both SQLite (server-side) and Firebase Firestore (user authentication data).
+- `supplies` - Supply inventory tracking with low-stock alerts
+- `inventory_items` - Full inventory management system
+- `sales` - Transaction tracking (repair, retail, pickup types)
+- `qrcodes` - QR code storage
 
 ### Frontend (React + Vite)
 
-**State management:** Context-based architecture
+**State management:** Context-based architecture with nested providers
+- `CustomerProvider` → `OperationProvider` → `AdminProvider` → `CartProvider` → `ProductProvider`
 - `CustomerContext` - Customer data and operations
 - `OperationContext` - Repair order/ticket management
 - `ProductContext` - Product/category catalog management
@@ -63,44 +81,48 @@ npm run create:admin      # Create admin user script
 - `AdminContext` - Admin-specific state
 
 **Authentication:** Local mock authentication using Zustand (`src/store/authStore.ts`)
-- Mock users with different roles (admin, manager, staff)
+- Mock users with roles: admin, manager, staff
 - Credentials stored in localStorage
-- Login component at `src/components/Login.tsx`
+- Login component at `src/pages/LoginPage.tsx`
+- Test credentials:
+  - admin@repairpro.com / admin123
+  - manager@repairpro.com / manager123
+  - staff1@repairpro.com / staff123
 
 **Routing:** `react-router-dom` v7 with nested routes
-- Protected routes use `ProtectedRoute` component with role-based access
 - All routes nested under main layout with collapsible sidebar
+- Protected routes use `ProtectedRoute` component with role-based access
 - Entry point: `src/App.tsx`
+- Online/offline detection built-in with status indicator
 
-**API integration:** Axios (or fetch) calls to backend via Vite proxy:
+**API integration:** Backend via Vite proxy:
 - Vite dev server proxies `/api` requests to `http://localhost:3000`
-
-**Authentication:** Firebase Authentication
-- Config: `src/config/firebase.ts` (currently has dummy values - needs real Firebase credentials)
-- User roles stored in Firestore: `users` collection with `role` field
-- Roles: `admin`, `manager`, `staff`
+- Direct fetch/axios calls to backend endpoints
 
 **UI Components:**
 - Material-UI (`@mui/material`) for base components
 - Tailwind CSS for styling
-- Radix UI for select components
+- Radix UI for select/switch/toast components
 - Lucide React icons
 - React Hot Toast for notifications
+- React Chart.js 2 for analytics
 
 ### Key Features
 
 - **Repair orders:** Multi-step workflow (drop-off → assembly → racking → pickup)
+- **Quick actions:** Hold/Quick Drop, No Charge/Do Over pages
 - **Inventory management:** Supplies tracking with low-stock alerts
 - **Sales:** Retail items for sale (polish, laces, insoles, accessories)
 - **QR codes:** Generate printable QR codes for various purposes
 - **Thermal printing:** Integration with thermal printers via USB
 - **Role-based access:** Admin-only routes (staff page, admin page)
+- **Reports:** Analytics dashboard with charts
 
 ## Important Notes
 
 1. **Database location:** SQLite database file at `server/database.db` - created automatically on first server run.
 
-2. **Transaction handling:** Backend uses manual BEGIN TRANSACTION / COMMIT / ROLLBACK for multi-step database operations.
+2. **Transaction handling:** Backend uses manual BEGIN TRANSACTION / COMMIT / ROLLBACK for multi-step database operations. The database module also provides a transaction wrapper function.
 
 3. **Column naming convention:** SQLite uses snake_case (e.g., `customer_id`), but TypeScript interfaces use camelCase. A transformer utility (`server/utils.ts`) converts between formats.
 
@@ -108,4 +130,18 @@ npm run create:admin      # Create admin user script
 
 5. **Image uploads:** Images are converted to base64 data URLs for local storage (no cloud storage required).
 
-6. **Deployment:** Configured for Netlify (see `netlify.toml`). Note that the Express backend won't work on Netlify - it's designed for local development or a separate Node.js hosting.
+6. **Online/offline detection:** App automatically detects network status and shows offline indicator when disconnected.
+
+7. **Deployment:** Configured for Netlify (see `netlify.toml`). Note that the Express backend won't work on Netlify - it's designed for local development or a separate Node.js hosting.
+
+## Database Schema Relationships
+
+```
+customers (1) ----< (many) operations
+operations (1) ----< (many) operation_shoes
+operation_shoes (1) ----< (many) operation_services
+services (1) ----< (many) operation_services
+
+categories (1) ----< (many) products
+sales_categories (1) ----< (many) sales_items
+```

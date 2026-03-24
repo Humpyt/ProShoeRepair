@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Users, Shield, Settings, FileText, ChevronRight, Search, Plus, Edit2, Trash2, X, Download } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import { format } from 'date-fns';
-import type { User, Role, Permission } from '../types/admin';
+import type { AdminUser, Role, Permission } from '../types/admin';
 
 type AdminSection = 'users' | 'roles' | 'settings' | 'audit';
 
@@ -76,8 +76,8 @@ const UserManagement: React.FC = () => {
   const { users, addUser, updateUser, deleteUser } = useAdmin();
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [newUser, setNewUser] = useState<Partial<User>>({
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
+  const [newUser, setNewUser] = useState<Partial<AdminUser>>({
     name: '',
     email: '',
     role: 'Staff',

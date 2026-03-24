@@ -3,7 +3,7 @@ export interface AdminUser {
   name: string;
   email: string;
   role: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'suspended';
   lastLogin: string;
   createdAt: string;
 }

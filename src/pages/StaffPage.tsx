@@ -4,7 +4,7 @@ import Staff from '../components/Staff';
 
 const StaffPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="p-6">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-indigo-400">Staff Management</h1>

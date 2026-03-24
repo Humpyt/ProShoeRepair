@@ -163,8 +163,8 @@ export function Staff() {
         return (
           <div key={member.id} className="grid grid-cols-5 gap-4 p-4 hover:bg-gray-750 transition-colors">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
-                <Users className="h-4 w-4 text-indigo-600" />
+              <div className="h-8 w-8 rounded-full bg-indigo-900/50 flex items-center justify-center">
+                <Users className="h-4 w-4 text-indigo-400" />
               </div>
               <div>
                 <div className="font-medium text-white">{member.name}</div>
@@ -241,23 +241,23 @@ export function Staff() {
   );
 
   return (
-    <div className="p-8">
+    <div>
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Daily target per staff: ${(DAILY_TARGET / 1000).toFixed(0)}k</p>
+          <h1 className="text-2xl font-bold text-white">Staff Management</h1>
+          <p className="text-sm text-gray-400 mt-1">Daily target per staff: ${(DAILY_TARGET / 1000).toFixed(0)}k</p>
         </div>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2 border border-gray-300 rounded-md">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-500'}`}
+              className={`p-2 ${viewMode === 'grid' ? 'text-indigo-400 bg-indigo-900/50' : 'text-gray-400 hover:text-gray-500'}`}
             >
               <LayoutGrid className="h-5 w-5" />
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-500'}`}
+              className={`p-2 ${viewMode === 'list' ? 'text-indigo-400 bg-indigo-900/50' : 'text-gray-400 hover:text-gray-500'}`}
             >
               <LayoutList className="h-5 w-5" />
             </button>
