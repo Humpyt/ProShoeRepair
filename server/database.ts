@@ -1,4 +1,5 @@
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
+import { promisify } from 'util';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -6,10 +7,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize database
-const db = new Database(path.join(__dirname, 'database.db'));
+const db = new sqlite3.Database(path.join(__dirname, 'database.db'));
+
+// Promisify database methods
+db.run = promisify(db.run.bind(db)) as any;
+db.get = promisify(db.get.bind(db)) as any;
+db.all = promisify(db.all.bind(db)) as any;
+db.exec = promisify(db.exec.bind(db)) as any;
 
 // Enable foreign keys
-db.pragma('foreign_keys = ON');
+db.exec('PRAGMA foreign_keys = ON;');
 
 // Create tables
 db.exec(`
@@ -139,6 +146,54 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Categories table
+  CREATE TABLE IF NOT EXISTS categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    created_at TEXT,
+    updated_at TEXT
+  );
+
+  -- Products table
+  CREATE TABLE IF NOT EXISTS products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    price REAL NOT NULL,
+    description TEXT,
+    image_url TEXT,
+    category_id TEXT NOT NULL,
+    in_stock INTEGER DEFAULT 1,
+    featured INTEGER DEFAULT 0,
+    created_at TEXT,
+    updated_at TEXT,
+    FOREIGN KEY (category_id) REFERENCES categories (id)
+  );
+
+  -- Sales categories table
+  CREATE TABLE IF NOT EXISTS sales_categories (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    display_order INTEGER DEFAULT 0,
+    created_at TEXT,
+    updated_at TEXT
+  );
+
+  -- Sales items table
+  CREATE TABLE IF NOT EXISTS sales_items (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category_id TEXT NOT NULL,
+    price REAL NOT NULL DEFAULT 0,
+    quantity INTEGER DEFAULT 0,
+    image_url TEXT,
+    created_at TEXT,
+    updated_at TEXT,
+    FOREIGN KEY (category_id) REFERENCES sales_categories (id)
+  );
 `);
 
 // Initialize database with indexes
@@ -151,51 +206,92 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_operation_services_service ON operation_services(service_id);
   CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customer_id);
   CREATE INDEX IF NOT EXISTS idx_qrcodes_type ON qrcodes(type);
+  CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
 `);
 
+// Create a wrapper to mimic better-sqlite3's prepare interface
+const createStatement = (sql: string) => {
+  return {
+    run: (...params: any[]) => db.run(sql, params),
+    get: (...params: any[]) => db.get(sql, params),
+    all: (...params: any[]) => db.all(sql, params),
+  };
+};
+
+// Extend db with prepare method
+(db as any).prepare = createStatement;
+
+// Add transaction method (simplified)
+(db as any).transaction = (fn: Function) => {
+  return async (...args: any[]) => {
+    await db.run('BEGIN TRANSACTION');
+    try {
+      const result = await fn(...args);
+      await db.run('COMMIT');
+      return result;
+    } catch (error) {
+      await db.run('ROLLBACK');
+      throw error;
+    }
+  };
+};
+
+// Add name property
+Object.defineProperty(db, 'name', {
+  get: () => path.join(__dirname, 'database.db')
+});
+
 // Function to initialize the database with some default data if needed
-const initializeDatabase = () => {
-  const categories = db.prepare('SELECT COUNT(*) as count FROM sales_categories').get();
-  if (categories.count === 0) {
-    // Add default sales categories
-    const defaultCategories = [
-      { id: 'cat_polish', name: 'Polish', description: 'Shoe polish products' },
-      { id: 'cat_laces', name: 'Laces', description: 'Shoe laces' },
-      { id: 'cat_insoles', name: 'Insoles', description: 'Shoe insoles' },
-      { id: 'cat_accessories', name: 'Accessories', description: 'Other shoe accessories' }
-    ];
+const initializeDatabase = async () => {
+  try {
+    const categories = await db.get("SELECT COUNT(*) as count FROM sales_categories");
+    if (!categories || categories.count === 0) {
+      // Add default sales categories
+      const defaultCategories = [
+        { id: 'cat_polish', name: 'Polish', description: 'Shoe polish products' },
+        { id: 'cat_laces', name: 'Laces', description: 'Shoe laces' },
+        { id: 'cat_insoles', name: 'Insoles', description: 'Shoe insoles' },
+        { id: 'cat_accessories', name: 'Accessories', description: 'Other shoe accessories' }
+      ];
 
-    const insertCategory = db.prepare(`
-      INSERT INTO sales_categories (id, name, description, created_at, updated_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `);
+      for (const category of defaultCategories) {
+        await db.run(
+          `INSERT INTO sales_categories (id, name, description, created_at, updated_at)
+           VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [category.id, category.name, category.description]
+        );
+      }
+    }
 
-    defaultCategories.forEach(category => {
-      insertCategory.run(category.id, category.name, category.description);
-    });
-  }
+    const services = await db.get("SELECT COUNT(*) as count FROM services");
+    if (!services || services.count === 0) {
+      // Add default services
+      const defaultServices = [
+        { id: 'srv_repair', name: 'Basic Repair', price: 25.00, estimated_days: 3, category: 'repair' },
+        { id: 'srv_polish', name: 'Polish Service', price: 15.00, estimated_days: 1, category: 'polish' },
+        { id: 'srv_clean', name: 'Deep Cleaning', price: 20.00, estimated_days: 2, category: 'cleaning' }
+      ];
 
-  const services = db.prepare('SELECT COUNT(*) as count FROM services').get();
-  if (services.count === 0) {
-    // Add default services
-    const defaultServices = [
-      { id: 'srv_repair', name: 'Basic Repair', price: 25.00, estimated_days: 3, category: 'repair' },
-      { id: 'srv_polish', name: 'Polish Service', price: 15.00, estimated_days: 1, category: 'polish' },
-      { id: 'srv_clean', name: 'Deep Cleaning', price: 20.00, estimated_days: 2, category: 'cleaning' }
-    ];
-
-    const insertService = db.prepare(`
-      INSERT INTO services (id, name, price, estimated_days, category, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `);
-
-    defaultServices.forEach(service => {
-      insertService.run(service.id, service.name, service.price, service.estimated_days, service.category);
-    });
+      for (const service of defaultServices) {
+        await db.run(
+          `INSERT INTO services (id, name, price, estimated_days, category, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [service.id, service.name, service.price, service.estimated_days, service.category]
+        );
+      }
+    }
+  } catch (error) {
+    console.error('Error initializing database:', error);
   }
 };
 
 // Initialize the database
 initializeDatabase();
 
-export default db;
+// Seed sample data
+import { seedProductsAndCategories } from './seed-data';
+seedProductsAndCategories().catch(err => {
+  console.error('Failed to seed products and categories:', err);
+});
+
+export default db as any;
