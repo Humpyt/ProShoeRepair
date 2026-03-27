@@ -356,42 +356,26 @@ router.get('/targets/staff/all', async (req, res) => {
         const estimatedCommission = monthlyTotal * commissionTier.rate;
 
         return {
-          userId: staff.id,
+          id: staff.id,
           name: staff.name,
           email: staff.email,
           role: staff.role,
-          targets: {
-            daily: dailyTarget,
-            monthly: monthlyTarget
-          },
-          todaySales: todayTotal,
-          monthlySales: monthlyTotal,
-          todayProgress: {
-            percentage: Math.round(todayPercentage * 100) / 100,
-            color: todayColor
-          },
-          monthlyProgress: {
-            percentage: Math.round(monthlyPercentage * 100) / 100,
-            color: monthlyColor
-          },
-          commission: {
-            tier: commissionTier.tier,
-            rate: commissionTier.rate,
-            estimatedCommission: Math.round(estimatedCommission)
-          }
+          daily_target: dailyTarget,
+          monthly_target: monthlyTarget,
+          today_sales: todayTotal,
+          monthly_sales: monthlyTotal,
+          daily_percentage: Math.round(todayPercentage * 100) / 100,
+          daily_color: todayColor,
+          monthly_percentage: Math.round(monthlyPercentage * 100) / 100,
+          monthly_color: monthlyColor,
+          commission_tier: commissionTier.tier,
+          commission_rate: commissionTier.rate,
+          estimated_commission: Math.round(estimatedCommission)
         };
       })
     );
 
-    res.json({
-      period: {
-        start: startOfMonth,
-        end: endOfMonth,
-        currentMonth: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
-        today: now.toLocaleDateString()
-      },
-      staff: staffPerformance
-    });
+    res.json(staffPerformance);
   } catch (error) {
     console.error('Error fetching all staff performance:', error);
     res.status(500).json({ error: 'Failed to fetch staff performance' });

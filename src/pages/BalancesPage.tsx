@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Printer, User, Phone, DollarSign, Calendar, Search, Filter, ChevronDown } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useOperation } from '../contexts/OperationContext';
+import { PaymentModal } from '../components/PaymentModal';
+import { useAuthStore } from '../store/authStore';
 
 interface BalanceRecord {
   id: string;
@@ -22,11 +24,14 @@ interface BalanceRecord {
 }
 
 export default function BalancesPage() {
-  const { operations } = useOperation();
+  const { operations, refreshOperations } = useOperation();
+  const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'partial'>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest');
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedBalance, setSelectedBalance] = useState<BalanceRecord | null>(null);
 
   // Filter and process operations with balances
   const balanceRecords: BalanceRecord[] = operations
@@ -241,6 +246,7 @@ export default function BalancesPage() {
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Paid</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold text-gray-300">Balance</th>
                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-300">Status</th>
+                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-300">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
@@ -299,6 +305,14 @@ export default function BalancesPage() {
                           </span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          onClick={() => { setSelectedBalance(record); setPaymentModalOpen(true); }}
+                          className="text-green-400 hover:text-green-300 text-sm font-medium"
+                        >
+                          Record Payment
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -317,6 +331,7 @@ export default function BalancesPage() {
                       {formatCurrency(totalBalance)}
                     </td>
                     <td className="px-4 py-3"></td>
+                    <td className="px-4 py-3"></td>
                   </tr>
                 </tfoot>
               </table>
@@ -325,7 +340,7 @@ export default function BalancesPage() {
         </div>
 
         {/* Print Styles */}
-        <style jsx>{`
+        <style>{`
           @media print {
             .no-print {
               display: none !important;
@@ -339,6 +354,38 @@ export default function BalancesPage() {
             }
           }
         `}</style>
+
+        {/* Payment Modal */}
+        <PaymentModal
+          isOpen={paymentModalOpen}
+          onClose={() => { setPaymentModalOpen(false); setSelectedBalance(null); }}
+          totalAmount={selectedBalance?.balance || 0}
+          customer={selectedBalance?.customer || null}
+          onComplete={async (payments) => {
+            if (!selectedBalance) return;
+            try {
+              const token = localStorage.getItem('auth_token');
+              await fetch(`http://localhost:3000/api/operations/${selectedBalance.id}/payments`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token && { 'Authorization': `Bearer ${token}` })
+                },
+                body: JSON.stringify({ payments })
+              });
+              setPaymentModalOpen(false);
+              setSelectedBalance(null);
+              // Refresh operations to update the balance list
+              if (refreshOperations) {
+                await refreshOperations();
+              }
+            } catch (error) {
+              console.error('Failed to record payment:', error);
+              alert('Failed to record payment');
+            }
+          }}
+          allowPartialPayments={true}
+        />
       </div>
     </div>
   );

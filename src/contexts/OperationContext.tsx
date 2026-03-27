@@ -22,6 +22,7 @@ interface Operation {
   shoes: ShoeItem[];
   status: 'pending' | 'in_progress' | 'completed' | 'held' | 'cancelled';
   totalAmount: number;
+  paidAmount?: number;
   discount?: number;
   isNoCharge?: boolean;
   isDoOver?: boolean;

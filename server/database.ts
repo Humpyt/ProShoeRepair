@@ -31,6 +31,7 @@ db.exec(`
     status TEXT DEFAULT 'active',
     total_orders INTEGER DEFAULT 0,
     total_spent REAL DEFAULT 0,
+    account_balance REAL DEFAULT 0,
     last_visit TEXT,
     loyalty_points INTEGER DEFAULT 0,
     created_at TEXT,
@@ -58,6 +59,7 @@ db.exec(`
     total_amount REAL NOT NULL DEFAULT 0,
     paid_amount REAL DEFAULT 0,
     discount REAL DEFAULT 0,
+    payment_method TEXT,
     notes TEXT,
     promised_date TEXT,
     is_no_charge INTEGER DEFAULT 0,
@@ -70,17 +72,58 @@ db.exec(`
     FOREIGN KEY (customer_id) REFERENCES customers (id)
   );
 
+  -- Operation payments table
+  CREATE TABLE IF NOT EXISTS operation_payments (
+    id TEXT PRIMARY KEY,
+    operation_id TEXT NOT NULL,
+    payment_method TEXT NOT NULL,
+    amount REAL NOT NULL,
+    transaction_id TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (operation_id) REFERENCES operations (id)
+  );
+
   -- Operation Shoes table
   CREATE TABLE IF NOT EXISTS operation_shoes (
     id TEXT PRIMARY KEY,
     operation_id TEXT NOT NULL,
     category TEXT NOT NULL,
+    shoe_size TEXT,
     color TEXT,
     notes TEXT,
     created_at TEXT,
     updated_at TEXT,
     FOREIGN KEY (operation_id) REFERENCES operations (id)
   );
+
+  -- Staff Conversations table
+  CREATE TABLE IF NOT EXISTS staff_conversations (
+    id TEXT PRIMARY KEY,
+    participant1_id TEXT NOT NULL,
+    participant2_id TEXT NOT NULL,
+    last_message_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (participant1_id) REFERENCES users(id),
+    FOREIGN KEY (participant2_id) REFERENCES users(id),
+    UNIQUE(participant1_id, participant2_id)
+  );
+
+  -- Staff Messages table
+  CREATE TABLE IF NOT EXISTS staff_messages (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES staff_conversations(id),
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_staff_messages_conversation ON staff_messages(conversation_id);
+  CREATE INDEX IF NOT EXISTS idx_staff_messages_sender ON staff_messages(sender_id);
+  CREATE INDEX IF NOT EXISTS idx_staff_messages_read ON staff_messages(is_read);
+  CREATE INDEX IF NOT EXISTS idx_staff_conversations_participants ON staff_conversations(participant1_id, participant2_id);
 
   -- Operation Services table
   CREATE TABLE IF NOT EXISTS operation_services (
@@ -309,9 +352,30 @@ const initializeDatabase = async () => {
       // Column already exists, ignore error
     }
 
+    // Migration: Add payment_method column to operations if it doesn't exist
+    try {
+      await db.run(`ALTER TABLE operations ADD COLUMN payment_method TEXT`);
+    } catch (e) {
+      // Column already exists, ignore error
+    }
+
+    // Migration: Add account_balance column to customers if it doesn't exist
+    try {
+      await db.run(`ALTER TABLE customers ADD COLUMN account_balance REAL DEFAULT 0`);
+    } catch (e) {
+      // Column already exists, ignore error
+    }
+
     // Migration: Add created_by column to sales if it doesn't exist
     try {
       await db.run(`ALTER TABLE sales ADD COLUMN created_by TEXT`);
+    } catch (e) {
+      // Column already exists, ignore error
+    }
+
+    // Migration: Add shoe_size column to operation_shoes if it doesn't exist
+    try {
+      await db.run(`ALTER TABLE operation_shoes ADD COLUMN shoe_size TEXT`);
     } catch (e) {
       // Column already exists, ignore error
     }
@@ -372,12 +436,6 @@ const initializeDatabase = async () => {
         `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         ['manager-001', 'Manager User', 'manager@repairpro.com', managerPassword, 'manager', 'active', now, now]
-      );
-
-      await db.run(
-        `INSERT INTO users (id, name, email, password_hash, role, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        ['staff-001', 'Staff One', 'staff1@repairpro.com', staffPassword, 'staff', 'active', now, now]
       );
 
       // Add new staff members

@@ -13,6 +13,7 @@ import productsRouter from './routes/products';
 import creditRoutes from './routes/credits';
 import businessRoutes from './routes/business';
 import authRoutes from './routes/auth';
+import staffMessagesRouter from './routes/staffMessages';
 import { transformCustomer, transformOperation, transformService } from './utils';
 
 const app = express();
@@ -44,6 +45,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/customers', creditRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/staff-messages', staffMessagesRouter);
 
 // Customer endpoints
 app.get('/api/customers', async (req, res) => {
@@ -150,17 +152,14 @@ app.post('/api/orders', async (req, res) => {
     let total_amount = 0;
     const now = new Date().toISOString();
 
-    // Start transaction
     await db.run('BEGIN TRANSACTION');
     
     try {
-      // Create order
       await db.prepare(`
         INSERT INTO operations (id, customer_id, total_amount, notes, promised_date, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(order_id, customer_id, total_amount, notes || null, promised_date || null, now, now);
 
-      // Add order items
       for (const item of items) {
         const item_id = uuidv4();
         total_amount += item.price * item.quantity;
@@ -171,12 +170,10 @@ app.post('/api/orders', async (req, res) => {
         `).run(item_id, order_id, item.service_id, item.quantity, item.price, item.notes || null, now, now);
       }
 
-      // Update order total
       await db.prepare(`
         UPDATE operations SET total_amount = ? WHERE id = ?
       `).run(total_amount, order_id);
 
-      // Update customer stats
       await db.prepare(`
         UPDATE customers 
         SET total_orders = total_orders + 1,
@@ -201,48 +198,6 @@ app.post('/api/orders', async (req, res) => {
   } catch (error) {
     console.error('Error creating order:', error);
     res.status(500).json({ error: 'Failed to create order' });
-  }
-});
-
-// Operations endpoints
-app.get('/api/operations', async (req, res) => {
-  try {
-    const operations = await db.prepare(`
-      SELECT 
-        o.*,
-        c.name as customer_name,
-        c.phone as customer_phone
-      FROM operations o
-      LEFT JOIN customers c ON o.customer_id = c.id
-      ORDER BY o.created_at DESC
-    `).all();
-
-    const operationsWithDetails = [];
-    for (const operation of operations) {
-      const shoes = await db.prepare(`
-        SELECT 
-          s.*,
-          GROUP_CONCAT(srv.name) as services
-        FROM operation_shoes s
-        LEFT JOIN operation_services os ON s.id = os.operation_shoe_id
-        LEFT JOIN services srv ON os.service_id = srv.id
-        WHERE s.operation_id = ?
-        GROUP BY s.id
-      `).all(operation.id);
-
-      operationsWithDetails.push({
-        ...operation,
-        shoes: shoes.map(shoe => ({
-          ...shoe,
-          services: shoe.services ? shoe.services.split(',') : []
-        }))
-      });
-    }
-
-    res.json(operationsWithDetails);
-  } catch (error) {
-    console.error('Error fetching operations:', error);
-    res.status(500).json({ error: 'Failed to fetch operations' });
   }
 });
 

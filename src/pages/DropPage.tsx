@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, User, Search, Star, Percent, Phone, Mail, Palette, Scissors, Settings, Edit2, Trash2, FolderOpen, CheckCircle, DollarSign, CreditCard } from 'lucide-react';
+import { X, Plus, User, Search, Star, Percent, Phone, Mail, Palette, Scissors, Settings, Edit2, Trash2, FolderOpen, CheckCircle, DollarSign, CreditCard, Calendar } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import type { Customer } from '../types';
 import { useCustomer } from '../contexts/CustomerContext';
@@ -27,6 +27,7 @@ interface ShoeItem {
   category: string;
   description: string;
   color: string;
+  size: string;
   services: {
     service_id: string;
     name: string;
@@ -75,6 +76,65 @@ const colors: ColorOption[] = [
   { id: 'white', name: 'White', bgClass: 'bg-white' },
   { id: 'yellow', name: 'Yellow', bgClass: 'bg-yellow-400' }
 ];
+
+const shoeSizes = [
+  // US sizes
+  { id: 'us-1', label: 'US 1', system: 'US' },
+  { id: 'us-2', label: 'US 2', system: 'US' },
+  { id: 'us-3', label: 'US 3', system: 'US' },
+  { id: 'us-4', label: 'US 4', system: 'US' },
+  { id: 'us-5', label: 'US 5', system: 'US' },
+  { id: 'us-6', label: 'US 6', system: 'US' },
+  { id: 'us-7', label: 'US 7', system: 'US' },
+  { id: 'us-8', label: 'US 8', system: 'US' },
+  { id: 'us-9', label: 'US 9', system: 'US' },
+  { id: 'us-10', label: 'US 10', system: 'US' },
+  { id: 'us-11', label: 'US 11', system: 'US' },
+  { id: 'us-12', label: 'US 12', system: 'US' },
+  { id: 'us-13', label: 'US 13', system: 'US' },
+  { id: 'us-14', label: 'US 14', system: 'US' },
+  { id: 'us-15', label: 'US 15', system: 'US' },
+  // UK sizes (half sizes)
+  { id: 'uk-0.5', label: 'UK 0.5', system: 'UK' },
+  { id: 'uk-1', label: 'UK 1', system: 'UK' },
+  { id: 'uk-1.5', label: 'UK 1.5', system: 'UK' },
+  { id: 'uk-2', label: 'UK 2', system: 'UK' },
+  { id: 'uk-2.5', label: 'UK 2.5', system: 'UK' },
+  { id: 'uk-3', label: 'UK 3', system: 'UK' },
+  { id: 'uk-3.5', label: 'UK 3.5', system: 'UK' },
+  { id: 'uk-4', label: 'UK 4', system: 'UK' },
+  { id: 'uk-4.5', label: 'UK 4.5', system: 'UK' },
+  { id: 'uk-5', label: 'UK 5', system: 'UK' },
+  { id: 'uk-5.5', label: 'UK 5.5', system: 'UK' },
+  { id: 'uk-6', label: 'UK 6', system: 'UK' },
+  { id: 'uk-6.5', label: 'UK 6.5', system: 'UK' },
+  { id: 'uk-7', label: 'UK 7', system: 'UK' },
+  { id: 'uk-7.5', label: 'UK 7.5', system: 'UK' },
+  { id: 'uk-8', label: 'UK 8', system: 'UK' },
+  { id: 'uk-8.5', label: 'UK 8.5', system: 'UK' },
+  { id: 'uk-9', label: 'UK 9', system: 'UK' },
+  { id: 'uk-9.5', label: 'UK 9.5', system: 'UK' },
+  { id: 'uk-10', label: 'UK 10', system: 'UK' },
+  { id: 'uk-10.5', label: 'UK 10.5', system: 'UK' },
+  { id: 'uk-11', label: 'UK 11', system: 'UK' },
+  { id: 'uk-11.5', label: 'UK 11.5', system: 'UK' },
+  { id: 'uk-12', label: 'UK 12', system: 'UK' },
+  { id: 'uk-12.5', label: 'UK 12.5', system: 'UK' },
+  { id: 'uk-13', label: 'UK 13', system: 'UK' },
+  { id: 'uk-13.5', label: 'UK 13.5', system: 'UK' },
+  { id: 'uk-14', label: 'UK 14', system: 'UK' },
+  { id: 'uk-14.5', label: 'UK 14.5', system: 'UK' },
+];
+
+// Categories that need shoe size (not bags, not other)
+const shoeCategories = [
+  'womens-high-heel', 'womens-flat', 'womens-dress-boot', 'womens-sneaker',
+  'mens-dress', 'mens-half-boot', 'mens-sneaker', 'mens-work', 'mens-western', 'mens-riding'
+];
+
+const needsSize = (categoryId: string | null): boolean => {
+  return categoryId !== null && categoryId !== 'bag' && categoryId !== 'other';
+};
 
 const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState({
@@ -269,6 +329,7 @@ export default function DropPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [sizeInput, setSizeInput] = useState<string>('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [shoes, setShoes] = useState<ShoeItem[]>([]);
   const [operationStatus, setOperationStatus] = useState<'none' | 'hold' | 'save'>('none');
@@ -282,6 +343,7 @@ export default function DropPage() {
   const [serviceSearchTerm, setServiceSearchTerm] = useState('');
   const [manualPrice, setManualPrice] = useState<string>('');
   const [useManualPrice, setUseManualPrice] = useState<boolean>(false);
+  const [promisedDate, setPromisedDate] = useState<string>('');
 
   // Admin mode state
   const [adminMode, setAdminMode] = useState(false);
@@ -365,6 +427,12 @@ export default function DropPage() {
       return;
     }
 
+    // Validate size is required for shoes (not bags or other)
+    if (needsSize(selectedCategory) && !sizeInput.trim()) {
+      alert('Please enter a shoe size');
+      return;
+    }
+
     // For "Other" category, validate custom name
     if (selectedCategory === 'other' && !customCategoryName.trim()) {
       alert('Please specify the service type when "Other" is selected');
@@ -384,6 +452,7 @@ export default function DropPage() {
         category: `other-${customCategoryName.trim().toLowerCase().replace(/\s+/g, '-')}`,
         description: customCategoryName.trim(),
         color: selectedColor || 'none',
+        size: '',
         services: [{
           service_id: 'custom-manual-price',
           name: customCategoryName.trim(),
@@ -400,6 +469,7 @@ export default function DropPage() {
       setManualPrice('');
       setUseManualPrice(false);
       setSelectedColor(null);
+      setSizeInput('');
       return;
     }
 
@@ -436,6 +506,7 @@ export default function DropPage() {
       category: selectedCategory === 'other' ? `other-${customCategoryName.trim().toLowerCase().replace(/\s+/g, '-')}` : selectedCategory,
       description: description,
       color: selectedColor || 'none',
+      size: needsSize(selectedCategory) ? sizeInput.trim() : '',
       services: shoeServices,
     };
 
@@ -443,6 +514,7 @@ export default function DropPage() {
     setSelectedCategory(null);
     setCustomCategoryName('');
     setSelectedColor(null);
+    setSizeInput('');
     setSelectedServices([]);
   };
 
@@ -509,6 +581,30 @@ export default function DropPage() {
       return total + shoeTotal;
     }, 0);
     return Math.max(0, subtotal - discountAmount);
+  };
+
+  // Calculate tentative ready date based on max estimated_days from services
+  const getTentativeReadyDate = (): string | null => {
+    if (shoes.length === 0 || !services.length) return null;
+
+    let maxDays = 0;
+    for (const shoe of shoes) {
+      for (const service of shoe.services) {
+        // Skip custom/manual price services
+        if (service.service_id === 'custom-manual-price') continue;
+        const serviceData = services.find((s: any) => s.id === service.service_id);
+        if (serviceData?.estimated_days && serviceData.estimated_days > maxDays) {
+          maxDays = serviceData.estimated_days;
+        }
+      }
+    }
+
+    if (maxDays === 0) return null;
+
+    const today = new Date();
+    const readyDate = new Date(today);
+    readyDate.setDate(readyDate.getDate() + maxDays);
+    return readyDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
   const currentSelectionTotal = selectedServices.reduce((sum, serviceId) => {
@@ -616,6 +712,7 @@ export default function DropPage() {
         isDelivery: activeCartButtons.includes('delivery'),
         isPickup: activeCartButtons.includes('pickup'),
         notes: '',
+        promisedDate: promisedDate || null,
       };
 
       await addOperation(operationData);
@@ -635,6 +732,7 @@ export default function DropPage() {
       setActiveCartButtons([]);
       setOperationPayments([]);
       setHasPayments(false);
+      setPromisedDate('');
 
       alert('Drop-off recorded successfully');
     } catch (error) {
@@ -1416,9 +1514,10 @@ export default function DropPage() {
           );
         })()}
 
-            {/* Color Selection and Add Button */}
+            {/* Color Selection and Size Selection */}
             {selectedServices.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="mt-4 pt-4 border-t border-gray-700 space-y-4">
+                {/* Color Row */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <span className="text-sm text-gray-400">Color:</span>
@@ -1449,14 +1548,41 @@ export default function DropPage() {
                       ))}
                     </div>
                   </div>
-                  <button
-                    onClick={handleAddShoe}
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
-                  >
-                    <Plus size={18} className="mr-2" />
-                    Add to Cart
-                  </button>
                 </div>
+                {/* Size Row - only for shoes, not bags or other */}
+                {needsSize(selectedCategory) && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm text-gray-400">Size:</span>
+                      <input
+                        type="text"
+                        value={sizeInput}
+                        onChange={(e) => setSizeInput(e.target.value)}
+                        placeholder="e.g., US 9, UK 8.5"
+                        className="px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none w-40"
+                      />
+                    </div>
+                    <button
+                      onClick={handleAddShoe}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
+                    >
+                      <Plus size={18} className="mr-2" />
+                      Add to Cart
+                    </button>
+                  </div>
+                )}
+                {/* Add to Cart button for bags/other (no size needed) */}
+                {!needsSize(selectedCategory) && selectedServices.length > 0 && (
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleAddShoe}
+                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
+                    >
+                      <Plus size={18} className="mr-2" />
+                      Add to Cart
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1503,6 +1629,13 @@ export default function DropPage() {
                           </span>
                         </div>
                       )}
+                      {shoe.size && (
+                        <div className="flex items-center mt-1">
+                          <span className="text-sm text-indigo-400">
+                            Size: {shoe.size}
+                          </span>
+                        </div>
+                      )}
                       <div className="mt-2 text-sm text-green-400 font-semibold">
                         {shoe.manualPrice
                           ? formatCurrency(shoe.manualPrice)
@@ -1523,6 +1656,28 @@ export default function DropPage() {
 
             {shoes.length > 0 && (
               <div className="mt-6 space-y-4">
+                {/* Promise Date - User Selectable */}
+                <div className="bg-indigo-900/30 border border-indigo-700 rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={18} className="text-indigo-400" />
+                      <span className="text-indigo-300 text-sm font-medium">Promise Date:</span>
+                    </div>
+                    {getTentativeReadyDate() && (
+                      <span className="text-indigo-400 text-xs">
+                        Suggested: {getTentativeReadyDate()}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={promisedDate}
+                    onChange={(e) => setPromisedDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-indigo-950/50 border border-indigo-700 rounded-lg px-4 py-2 text-indigo-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+
                 {/* Quick Actions Row - Delivery, Pickup, Discount */}
                 <div className="grid grid-cols-3 gap-3">
                   <button

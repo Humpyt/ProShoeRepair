@@ -35,6 +35,8 @@ export const transformOperation = (operation: any) => ({
         name: operation.customer_name,
         phone: operation.customer_phone
     } : null,
+    createdBy: operation.created_by || null,
+    staffName: operation.staff_name || null,
     shoes: operation.shoes || []
 });
 

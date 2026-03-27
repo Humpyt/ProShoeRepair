@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Filter, Search, Package, DollarSign, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useOperation } from '../contexts/OperationContext';
+import { useAuthStore } from '../store/authStore';
 import { format } from 'date-fns';
 
 // Helper function to safely format dates
@@ -19,12 +20,14 @@ const safeFormat = (date: string | Date | null | undefined, formatStr: string) =
 
 export default function OperationPage() {
   const navigate = useNavigate();
-  const [timeFilter, setTimeFilter] = useState<'today' | 'tomorrow' | 'all'>('today');
+  const { user } = useAuthStore();
+  const [timeFilter, setTimeFilter] = useState<'today' | 'tomorrow' | 'all' | 'custom'>('today');
+  const [customDate, setCustomDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const { operations } = useOperation();
 
-  // Convert operations to work items
-  const workItems = operations.map(operation => ({
+  // Memoize workItems to avoid recomputing on every render
+  const workItems = useMemo(() => operations.map(operation => ({
     id: operation.id,
     ticketNo: `TKT-${operation.id.slice(-6).toUpperCase()}`,
     custNo: operation.customer?.id ? `CST-${operation.customer.id.slice(-6).toUpperCase()}` : 'N/A',
@@ -35,17 +38,21 @@ export default function OperationPage() {
     readyDate: safeFormat(operation.updatedAt, 'MM/dd/yyyy'),
     readyTime: safeFormat(operation.updatedAt, 'hh:mm a'),
     amount: operation.totalAmount || 0,
+    paid: operation.paidAmount || 0,
+    balance: (operation.totalAmount || 0) - (operation.paidAmount || 0),
     discount: (operation as any).discount || 0,
     status: operation.status,
     isNoCharge: operation.isNoCharge || false,
     isDoOver: operation.isDoOver || false,
     isDelivery: operation.isDelivery || false,
     isPickup: operation.isPickup || false,
-  }));
+    createdBy: (operation as any).createdBy || null,
+    staffName: (operation as any).staffName || null,
+  })), [operations]);
 
-  // Filter work items based on time filter and search query
-  const filteredWorkItems = workItems.filter(item => {
-    const matchesSearch = 
+  // Memoize filtered work items
+  const filteredWorkItems = useMemo(() => workItems.filter(item => {
+    const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.ticketNo.includes(searchQuery) ||
       item.custNo.includes(searchQuery);
@@ -57,20 +64,44 @@ export default function OperationPage() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    let matchesTimeFilter = true;
     switch (timeFilter) {
       case 'today':
-        return itemDate.toDateString() === today.toDateString();
+        matchesTimeFilter = itemDate.toDateString() === today.toDateString();
+        break;
       case 'tomorrow':
-        return itemDate.toDateString() === tomorrow.toDateString();
+        matchesTimeFilter = itemDate.toDateString() === tomorrow.toDateString();
+        break;
+      case 'custom':
+        if (customDate) {
+          const filterDate = new Date(customDate);
+          matchesTimeFilter = itemDate.toDateString() === filterDate.toDateString();
+        }
+        break;
       default:
-        return true;
+        matchesTimeFilter = true;
     }
-  });
 
-  const handleViewDetails = (operationId: string) => {
-    // Navigate to the operation details page
+    if (!matchesTimeFilter) return false;
+
+    // Staff can only see their own operations
+    if (user?.role === 'staff' && item.createdBy !== user.id) {
+      return false;
+    }
+
+    return true;
+  }), [workItems, timeFilter, customDate, searchQuery, user]);
+
+  // Memoize navigation handler
+  const handleViewDetails = useCallback((operationId: string) => {
     navigate(`/operations/details/${operationId}`);
-  };
+  }, [navigate]);
+
+  // Memoize total value calculation
+  const totalValue = useMemo(() =>
+    filteredWorkItems.reduce((acc, item) => acc + item.amount, 0),
+    [filteredWorkItems]
+  );
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -85,7 +116,7 @@ export default function OperationPage() {
             <Package className="h-5 w-5" />
             <span>Total Items: {filteredWorkItems.length}</span>
             <DollarSign className="h-5 w-5 ml-4" />
-            <span>Value: {formatCurrency(filteredWorkItems.reduce((acc, item) => acc + item.amount, 0))}</span>
+            <span>Value: {formatCurrency(totalValue)}</span>
           </div>
         </div>
       </div>
@@ -104,33 +135,52 @@ export default function OperationPage() {
             />
           </div>
           <div className="flex space-x-2">
-            <button 
+            <button
               className={`btn-bevel px-6 py-2 rounded-lg flex items-center ${
                 timeFilter === 'today' ? 'accent-primary' : 'accent-secondary'
               }`}
-              onClick={() => setTimeFilter('today')}
+              onClick={() => { setTimeFilter('today'); setCustomDate(''); }}
             >
               <Calendar className="h-5 w-5 mr-2" />
               Today
             </button>
-            <button 
+            <button
               className={`btn-bevel px-6 py-2 rounded-lg flex items-center ${
                 timeFilter === 'tomorrow' ? 'accent-primary' : 'accent-secondary'
               }`}
-              onClick={() => setTimeFilter('tomorrow')}
+              onClick={() => { setTimeFilter('tomorrow'); setCustomDate(''); }}
             >
               <Clock className="h-5 w-5 mr-2" />
               Tomorrow
             </button>
-            <button 
+            <button
               className={`btn-bevel px-6 py-2 rounded-lg flex items-center ${
                 timeFilter === 'all' ? 'accent-primary' : 'accent-secondary'
               }`}
-              onClick={() => setTimeFilter('all')}
+              onClick={() => { setTimeFilter('all'); setCustomDate(''); }}
             >
               <Filter className="h-5 w-5 mr-2" />
               All
             </button>
+            <div className="flex items-center space-x-2">
+              <button
+                className={`btn-bevel px-4 py-2 rounded-lg flex items-center ${
+                  timeFilter === 'custom' ? 'accent-primary' : 'accent-secondary'
+                }`}
+                onClick={() => setTimeFilter('custom')}
+              >
+                <Calendar className="h-5 w-5 mr-2" />
+                Date
+              </button>
+              {timeFilter === 'custom' && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  className="bg-gray-700 rounded-lg px-3 py-2 text-white border border-gray-600 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                />
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -142,11 +192,13 @@ export default function OperationPage() {
             <tr>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Ticket No</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Customer ID</th>
+              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Created By</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Name</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Pairs</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Created</th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Ready By</th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
+              <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Balance</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Flags</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
               <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Actions</th>
@@ -171,6 +223,9 @@ export default function OperationPage() {
                       {item.custNo}
                     </span>
                   </div>
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-300">
+                  {item.staffName || 'N/A'}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center">
@@ -206,6 +261,17 @@ export default function OperationPage() {
                   ) : (
                     <div className="text-sm font-medium text-white">
                       {formatCurrency(item.amount)}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {item.balance > 0 ? (
+                    <div className="text-sm font-bold text-red-400">
+                      {formatCurrency(item.balance)}
+                    </div>
+                  ) : (
+                    <div className="text-sm font-medium text-green-400">
+                      Paid
                     </div>
                   )}
                 </td>

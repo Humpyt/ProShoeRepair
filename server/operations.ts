@@ -5,94 +5,66 @@ import { transformOperation } from './utils';
 
 const router = express.Router();
 
-// Create operation table if it doesn't exist
-db.exec(`
-  CREATE TABLE IF NOT EXISTS operations (
-    id TEXT PRIMARY KEY,
-    customer_id TEXT,
-    status TEXT DEFAULT 'pending',
-    total_amount REAL NOT NULL DEFAULT 0,
-    paid_amount REAL DEFAULT 0,
-    discount REAL DEFAULT 0,
-    notes TEXT,
-    promised_date TEXT,
-    created_at TEXT,
-    updated_at TEXT,
-    is_no_charge INTEGER DEFAULT 0,
-    is_do_over INTEGER DEFAULT 0,
-    is_delivery INTEGER DEFAULT 0,
-    is_pickup INTEGER DEFAULT 0,
-    FOREIGN KEY (customer_id) REFERENCES customers (id)
-  )
-`);
-
-// Create operation_shoes table for the many-to-many relationship
-db.exec(`
-  CREATE TABLE IF NOT EXISTS operation_shoes (
-    id TEXT PRIMARY KEY,
-    operation_id TEXT NOT NULL,
-    category TEXT NOT NULL,
-    color TEXT,
-    notes TEXT,
-    created_at TEXT,
-    updated_at TEXT,
-    FOREIGN KEY (operation_id) REFERENCES operations (id)
-  )
-`);
-
-// Create operation_services table for the many-to-many relationship
-db.exec(`
-  CREATE TABLE IF NOT EXISTS operation_services (
-    id TEXT PRIMARY KEY,
-    operation_shoe_id TEXT NOT NULL,
-    service_id TEXT NOT NULL,
-    quantity INTEGER DEFAULT 1,
-    price REAL NOT NULL,
-    notes TEXT,
-    created_at TEXT,
-    updated_at TEXT,
-    FOREIGN KEY (operation_shoe_id) REFERENCES operation_shoes (id),
-    FOREIGN KEY (service_id) REFERENCES services (id)
-  )
-`);
-
 // Get all operations
 router.get('/', async (req, res) => {
   try {
-    const operations = await db.prepare(`
-      SELECT o.*, c.name as customer_name, c.phone as customer_phone
+    const { created_by } = req.query;
+    let query = `
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone, u.name as staff_name
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
-      ORDER BY o.created_at DESC
-    `).all();
+      LEFT JOIN users u ON o.created_by = u.id
+    `;
+    const params: any[] = [];
 
-    // Get shoes and services for each operation
-    const operationsWithShoes = [];
-    for (const operation of operations) {
-      const shoes = await db.prepare(`
+    if (created_by) {
+      query += ` WHERE o.created_by = ?`;
+      params.push(created_by);
+    }
+
+    query += ` ORDER BY o.created_at DESC`;
+
+    const operations = await db.prepare(query).all(...params);
+
+    // Optimization: Fetch all shoes in a single query instead of N+1 queries
+    const operationIds = operations.map((op: any) => op.id);
+    let shoesMap: Map<string, any[]> = new Map();
+
+    if (operationIds.length > 0) {
+      const placeholders = operationIds.map(() => '?').join(',');
+      const allShoes = await db.prepare(`
         SELECT os.*, s.name as service_name, s.price as service_base_price
         FROM operation_shoes os
         LEFT JOIN operation_services oss ON os.id = oss.operation_shoe_id
         LEFT JOIN services s ON oss.service_id = s.id
-        WHERE os.operation_id = ?
-      `).all(operation.id);
+        WHERE os.operation_id IN (${placeholders})
+      `).all(...operationIds);
 
-      operationsWithShoes.push({
-        ...operation,
-        shoes: shoes.map(shoe => ({
-          id: shoe.id,
-          category: shoe.category,
-          color: shoe.color,
-          notes: shoe.notes,
-          services: [{
-            id: shoe.service_id,
-            name: shoe.service_name,
-            price: shoe.price,
-            basePrice: shoe.service_base_price
-          }]
-        }))
-      });
+      // Group shoes by operation_id
+      for (const shoe of allShoes) {
+        if (!shoesMap.has(shoe.operation_id)) {
+          shoesMap.set(shoe.operation_id, []);
+        }
+        shoesMap.get(shoe.operation_id)!.push(shoe);
+      }
     }
+
+    // Build operations with shoes
+    const operationsWithShoes = operations.map((operation: any) => ({
+      ...operation,
+      shoes: (shoesMap.get(operation.id) || []).map((shoe: any) => ({
+        id: shoe.id,
+        category: shoe.category,
+        color: shoe.color,
+        notes: shoe.notes,
+        services: [{
+          id: shoe.service_id,
+          name: shoe.service_name,
+          price: shoe.price,
+          basePrice: shoe.service_base_price
+        }]
+      }))
+    }));
 
     res.json(operationsWithShoes.map(transformOperation));
   } catch (error) {
@@ -106,17 +78,43 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const operation = await db.prepare(`
-      SELECT o.*, c.name as customer_name, c.phone as customer_phone
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone, u.name as staff_name
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
+      LEFT JOIN users u ON o.created_by = u.id
       WHERE o.id = ?
     `).get(id);
-    
+
     if (!operation) {
       return res.status(404).json({ error: 'Operation not found' });
     }
-    
-    res.json(transformOperation(operation));
+
+    // Get shoes and services for this operation
+    const shoes = await db.prepare(`
+      SELECT os.*, s.name as service_name, s.price as service_base_price
+      FROM operation_shoes os
+      LEFT JOIN operation_services oss ON os.id = oss.operation_shoe_id
+      LEFT JOIN services s ON oss.service_id = s.id
+      WHERE os.operation_id = ?
+    `).all(id);
+
+    const operationWithShoes = {
+      ...operation,
+      shoes: shoes.map((shoe: any) => ({
+        id: shoe.id,
+        category: shoe.category,
+        color: shoe.color,
+        notes: shoe.notes,
+        services: [{
+          id: shoe.service_id,
+          name: shoe.service_name,
+          price: shoe.price,
+          basePrice: shoe.service_base_price
+        }]
+      }))
+    };
+
+    res.json(transformOperation(operationWithShoes));
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch operation' });
   }
@@ -143,7 +141,7 @@ router.get('/:id/payments', async (req, res) => {
 // Create new operation
 router.post('/', async (req, res) => {
   console.log('Received operation request:', JSON.stringify(req.body, null, 2));
-  const { customer, shoes, status, totalAmount, discount, isNoCharge, isDoOver, isDelivery, isPickup, notes } = req.body;
+  const { customer, shoes, status, totalAmount, discount, isNoCharge, isDoOver, isDelivery, isPickup, notes, promisedDate, created_by } = req.body;
   const now = new Date().toISOString();
 
   if (!customer || !customer.id) {
@@ -166,10 +164,10 @@ router.post('/', async (req, res) => {
 
       await db.prepare(`
         INSERT INTO operations (
-          id, customer_id, status, total_amount, discount, notes,
+          id, customer_id, status, total_amount, discount, notes, promised_date,
           is_no_charge, is_do_over, is_delivery, is_pickup,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          created_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         operationId,
         customer.id,
@@ -177,10 +175,12 @@ router.post('/', async (req, res) => {
         totalAmount || 0,
         discount || 0,
         notes || null,
+        promisedDate || null,
         isNoCharge ? 1 : 0,
         isDoOver ? 1 : 0,
         isDelivery ? 1 : 0,
         isPickup ? 1 : 0,
+        created_by || null,
         now,
         now
       );
@@ -193,12 +193,13 @@ router.post('/', async (req, res) => {
         
         await db.prepare(`
           INSERT INTO operation_shoes (
-            id, operation_id, category, color, notes, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            id, operation_id, category, shoe_size, color, notes, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           shoeId,
           operationId,
           shoe.category,
+          shoe.size || null,
           shoe.color || null,
           shoe.notes || null,
           now,
@@ -266,7 +267,7 @@ router.post('/', async (req, res) => {
 
         shoesWithServices.push({
           ...shoe,
-          services: services.map(s => ({
+          services: services.map((s: any) => ({
             id: s.service_id,
             name: s.service_name,
             price: s.price,
@@ -275,6 +276,14 @@ router.post('/', async (req, res) => {
           }))
         });
       }
+
+      // Update customer stats: increment total_orders and update last_visit
+      await db.prepare(`
+        UPDATE customers
+        SET total_orders = total_orders + 1,
+            last_visit = ?
+        WHERE id = ?
+      `).run(now, customer.id);
 
       await db.run('COMMIT');
       
@@ -372,6 +381,14 @@ router.post('/:id/payments', async (req, res) => {
           updated_at = ?
       WHERE id = ?
     `, [newPaidAmount, newPaidAmount, now, id]);
+
+    // Update customer stats: add to total_spent and update last_visit
+    await db.prepare(`
+      UPDATE customers
+      SET total_spent = total_spent + ?,
+          last_visit = ?
+      WHERE id = ?
+    `).run(totalPaid, now, (operation as any).customer_id);
 
     await db.run('COMMIT');
 
