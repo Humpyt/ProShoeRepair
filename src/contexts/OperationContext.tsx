@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import type { Customer } from '../types';
+import { getAuthToken } from '../store/authStore';
 
 interface ShoeService {
   service_id: string;
@@ -52,7 +53,14 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchOperations = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/operations');
+        const token = getAuthToken();
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch('http://localhost:3000/api/operations', { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch operations');
         }
@@ -72,12 +80,18 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
       const authUserStr = localStorage.getItem('auth_user');
       const authUser = authUserStr ? JSON.parse(authUserStr) : null;
       const userId = authUser?.id || null;
+      const token = getAuthToken();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const response = await fetch('http://localhost:3000/api/operations', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           ...operationData,
           created_by: userId
@@ -104,11 +118,16 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
 
   const updateOperation = useCallback(async (id: string, updates: Partial<Operation>) => {
     try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`http://localhost:3000/api/operations/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ ...updates, updatedAt: new Date().toISOString() }),
       });
 
@@ -126,8 +145,14 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
 
   const deleteOperation = useCallback(async (id: string) => {
     try {
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const response = await fetch(`http://localhost:3000/api/operations/${id}`, {
         method: 'DELETE',
+        headers,
       });
 
       if (!response.ok) {
@@ -147,7 +172,12 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
 
   const refreshOperations = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/operations');
+      const token = getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('http://localhost:3000/api/operations', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch operations');
       }

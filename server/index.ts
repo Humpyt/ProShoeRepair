@@ -14,6 +14,10 @@ import creditRoutes from './routes/credits';
 import businessRoutes from './routes/business';
 import authRoutes from './routes/auth';
 import staffMessagesRouter from './routes/staffMessages';
+import colorsRouter from './routes/colors';
+import invoicesRouter from './routes/invoices';
+import analyticsRouter from './routes/analytics';
+import retailProductsRouter from './routes/retailProducts';
 import { transformCustomer, transformOperation, transformService } from './utils';
 
 const app = express();
@@ -46,6 +50,10 @@ app.use('/api/customers', creditRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/staff-messages', staffMessagesRouter);
+app.use('/api/colors', colorsRouter);
+app.use('/api/invoices', invoicesRouter);
+app.use('/api/analytics', analyticsRouter);
+app.use('/api/retail-products', retailProductsRouter);
 
 // Customer endpoints
 app.get('/api/customers', async (req, res) => {
@@ -66,12 +74,12 @@ app.post('/api/customers', async (req, res) => {
     const { name, phone, email, address } = req.body;
     const id = uuidv4();
     const now = new Date().toISOString();
-    
+
     await db.prepare(`
       INSERT INTO customers (id, name, phone, email, address, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(id, name, phone, email || null, address || null, now, now);
-    
+
     res.json({ id, name, phone, email, address });
   } catch (error) {
     console.error('Error creating customer:', error);
@@ -84,7 +92,7 @@ app.put('/api/customers/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const now = new Date().toISOString();
-    
+
     const setClauses = Object.keys(updates)
       .map(key => {
         const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -92,9 +100,9 @@ app.put('/api/customers/:id', async (req, res) => {
       })
       .concat(['updated_at = ?'])
       .join(', ');
-    
+
     const values = [...Object.values(updates), now, id];
-    
+
     await db.prepare(`
       UPDATE customers
       SET ${setClauses}
@@ -113,13 +121,13 @@ app.delete('/api/customers/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const now = new Date().toISOString();
-    
+
     await db.prepare(`
       UPDATE customers 
       SET status = 'inactive', updated_at = ? 
       WHERE id = ?
     `).run(now, id);
-    
+
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting customer:', error);
@@ -146,14 +154,14 @@ app.get('/api/orders', async (req, res) => {
 
 app.post('/api/orders', async (req, res) => {
   const { customer_id, items, notes, promised_date } = req.body;
-  
+
   try {
     const order_id = uuidv4();
     let total_amount = 0;
     const now = new Date().toISOString();
 
     await db.run('BEGIN TRANSACTION');
-    
+
     try {
       await db.prepare(`
         INSERT INTO operations (id, customer_id, total_amount, notes, promised_date, created_at, updated_at)
@@ -163,7 +171,7 @@ app.post('/api/orders', async (req, res) => {
       for (const item of items) {
         const item_id = uuidv4();
         total_amount += item.price * item.quantity;
-        
+
         await db.prepare(`
           INSERT INTO operation_services (id, operation_shoe_id, service_id, quantity, price, notes, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -188,7 +196,7 @@ app.post('/api/orders', async (req, res) => {
         LEFT JOIN customers c ON o.customer_id = c.id
         WHERE o.id = ?
       `).get(order_id);
-      
+
       await db.run('COMMIT');
       res.status(201).json(transformOperation(order));
     } catch (error) {
@@ -217,7 +225,7 @@ app.post('/api/services', async (req, res) => {
     const { name, description, price, estimated_days, category } = req.body;
     const id = uuidv4();
     const now = new Date().toISOString();
-    
+
     const result = await db.prepare(`
       INSERT INTO services (id, name, description, price, estimated_days, category, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -315,7 +323,7 @@ app.get('/api/sales-items/category/:categoryId', async (req, res) => {
 app.listen(port, async () => {
   console.log(`Server is running on http://localhost:${port}`);
   console.log('Database file:', (db as any).name);
-  
+
   // Test database connection
   try {
     const customerCount = await db.prepare('SELECT COUNT(*) as count FROM customers').get();

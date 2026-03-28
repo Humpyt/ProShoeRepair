@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useStaffMessages } from '../contexts/StaffMessageContext';
 import {
   Store,
   Users,
@@ -17,7 +18,8 @@ import {
   Target,
   UserCog,
   Shield,
-  DollarSign
+  Wallet,
+  Receipt
 } from 'lucide-react';
 
 interface MainMenuProps {
@@ -30,33 +32,53 @@ interface NavItemProps {
   to: string;
   isActive: boolean;
   isCollapsed: boolean;
-  permission?: string;
-  roles?: string[];
+  badge?: number;
 }
 
-const NavItem = ({ icon: Icon, label, to, isActive, isCollapsed, permission, roles }: NavItemProps) => {
+const NavItem = ({ icon: Icon, label, to, isActive, isCollapsed, badge }: NavItemProps) => {
   const navigate = useNavigate();
-  
+
   return (
-    <button 
+    <button
       onClick={() => navigate(to)}
       title={isCollapsed ? label : undefined}
       className={`
-        flex items-center px-5 py-2.5 rounded-lg w-full
-        transition-all duration-200
-        ${isActive 
-          ? 'bg-indigo-600 text-white shadow-lg translate-x-1.5' 
-          : 'text-gray-300 hover:bg-indigo-600/20 hover:text-white hover:translate-x-1.5'
+        group relative flex items-center h-11 rounded-xl w-full
+        transition-all duration-300 ease-out mb-1
+        ${isCollapsed ? 'justify-center px-0' : 'px-4'}
+        ${isActive
+          ? 'bg-indigo-600/20 text-white shadow-[0_0_20px_rgba(79,70,229,0.2)] border border-indigo-500/20'
+          : 'text-gray-400 hover:bg-white/5 hover:text-white'
         }
       `}
     >
-      <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
-        <Icon className="h-5 w-5" />
+      <div className={`flex items-center justify-center transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+        <Icon size={isCollapsed ? 22 : 18} className={isActive ? 'text-indigo-400' : ''} />
       </div>
+
       {!isCollapsed && (
         <span className="ml-3 text-sm font-medium tracking-wide truncate">
           {label}
         </span>
+      )}
+
+      {/* Active Pill Indicator */}
+      {isActive && !isCollapsed && (
+        <div className="absolute right-3 w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]" />
+      )}
+
+      {/* Badge for unread messages */}
+      {badge !== undefined && badge > 0 && (
+        <span className={`absolute ${isCollapsed ? '-top-1 -right-1' : '-top-1 right-3'} bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full`}>
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+
+      {/* Tooltip for collapsed state */}
+      {isCollapsed && (
+        <div className="absolute left-16 bg-gray-900 text-white text-xs px-2.5 py-2 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap border border-white/10 shadow-2xl">
+          {label}
+        </div>
       )}
     </button>
   );
@@ -71,7 +93,7 @@ const menuGroups = [
       { icon: Download, label: "Drop", to: "/drop", permission: "create_drop" },
       { icon: Upload, label: "Pickup", to: "/pickup", permission: "create_pickup" },
       { icon: CreditCard, label: "Balances", to: "/balances" },
-      { icon: MessageSquare, label: "Messages", to: "/messages", permission: "send_messages" },
+      { icon: MessageSquare, label: "Messages", to: "/messages", permission: "send_messages", badge: true },
     ]
   },
   {
@@ -79,6 +101,7 @@ const menuGroups = [
     items: [
       { icon: Settings, label: "Operation", to: "/operation", permission: "view_operations" },
       { icon: Package, label: "Supplies", to: "/supplies", permission: "manage_supplies", roles: ["admin", "manager"] },
+      { icon: Wallet, label: "Expenses", to: "/expenses", roles: ["admin", "manager"] },
       { icon: ShoppingBag, label: "Sales", to: "/sales", permission: "view_sales" },
       { icon: QrCode, label: "QR Codes", to: "/qrcodes", permission: "view_qrcodes" },
     ]
@@ -89,6 +112,7 @@ const menuGroups = [
       { icon: Megaphone, label: "Marketing", to: "/marketing", permission: "view_marketing" },
       { icon: BarChart3, label: "Reports", to: "/reports", permission: "view_reports", roles: ["admin", "manager"] },
       { icon: Target, label: "Business Targets", to: "/business-targets", permission: "view_business_targets" },
+      { icon: Receipt, label: "Invoices", to: "/invoices", roles: ["admin", "manager"] },
       { icon: UserCog, label: "Staff", to: "/staff", permission: "manage_staff", roles: ["admin", "manager"] },
       { icon: Shield, label: "Admin", to: "/admin", permission: "manage_users", roles: ["admin"] },
     ]
@@ -99,41 +123,34 @@ const MainMenu: React.FC<MainMenuProps> = ({ isCollapsed }) => {
   const location = useLocation();
   const currentPath = location.pathname;
   const { user, hasPermission } = useAuthStore();
+  const { unreadCount } = useStaffMessages();
 
-  // Filter menu items based on permissions and roles
   const filterMenuItems = (items: typeof menuGroups[0]['items']) => {
     return items.filter(item => {
-      // Always show items with no permission requirements
+      // @ts-ignore
       if (!item.permission && !item.roles) return true;
-
-      // Check role requirement
-      if (item.roles && user && !item.roles.includes(user.role)) {
-        return false;
-      }
-
-      // Check permission requirement
-      if (item.permission && !hasPermission(item.permission)) {
-        return false;
-      }
-
+      // @ts-ignore
+      if (item.roles && user && !item.roles.includes(user.role)) return false;
+      // @ts-ignore
+      if (item.permission && !hasPermission(item.permission)) return false;
       return true;
     });
   };
 
   return (
-    <nav className="h-full py-4 flex flex-col gap-4">
+    <nav className="h-full py-6 flex flex-col gap-6 overflow-y-auto no-scrollbar">
       {menuGroups.map((group, groupIndex) => {
         const filteredItems = filterMenuItems(group.items);
-
-        // Don't render empty groups
         if (filteredItems.length === 0) return null;
 
         return (
-          <div key={groupIndex} className="px-4">
-            {!isCollapsed && (
-              <h2 className="mb-2 px-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div key={groupIndex} className={isCollapsed ? 'px-2' : 'px-4'}>
+            {!isCollapsed ? (
+              <h2 className="mb-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] opacity-80">
                 {group.title}
               </h2>
+            ) : (
+              <div className="h-px bg-white/5 mx-2 mb-4" />
             )}
             <div className="space-y-1">
               {filteredItems.map((item, itemIndex) => (
@@ -144,8 +161,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ isCollapsed }) => {
                   to={item.to}
                   isActive={currentPath === item.to}
                   isCollapsed={isCollapsed}
-                  permission={item.permission}
-                  roles={item.roles}
+                  badge={(item as any).badge ? unreadCount : undefined}
                 />
               ))}
             </div>

@@ -22,6 +22,7 @@ export const transformOperation = (operation: any) => ({
     status: operation.status || 'pending',
     totalAmount: operation.total_amount || 0,
     paidAmount: operation.paid_amount || 0,
+    discount: operation.discount || 0,
     notes: operation.notes || '',
     promisedDate: operation.promised_date || null,
     createdAt: operation.created_at,
@@ -37,7 +38,10 @@ export const transformOperation = (operation: any) => ({
     } : null,
     createdBy: operation.created_by || null,
     staffName: operation.staff_name || null,
-    shoes: operation.shoes || []
+    shoes: operation.shoes || [],
+    retailItems: operation.retailItems || [],
+    generatedDocumentId: operation.generatedDocumentId || null,
+    generatedDocumentType: operation.generatedDocumentType || null
 });
 
 export const transformService = (service: any) => ({

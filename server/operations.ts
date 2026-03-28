@@ -5,6 +5,39 @@ import { transformOperation } from './utils';
 
 const router = express.Router();
 
+const mapRetailItem = (item: any) => ({
+  id: item.id,
+  productId: item.product_id || null,
+  productName: item.product_name,
+  unitPrice: item.unit_price,
+  quantity: item.quantity,
+  totalPrice: item.total_price,
+});
+
+const getRetailItemsByOperationIds = async (operationIds: string[]) => {
+  const retailItemsMap = new Map<string, any[]>();
+
+  if (operationIds.length === 0) {
+    return retailItemsMap;
+  }
+
+  const placeholders = operationIds.map(() => '?').join(',');
+  const retailItems = await db.prepare(`
+    SELECT * FROM operation_retail_items
+    WHERE operation_id IN (${placeholders})
+    ORDER BY created_at ASC
+  `).all(...operationIds);
+
+  for (const item of retailItems) {
+    if (!retailItemsMap.has(item.operation_id)) {
+      retailItemsMap.set(item.operation_id, []);
+    }
+    retailItemsMap.get(item.operation_id)!.push(mapRetailItem(item));
+  }
+
+  return retailItemsMap;
+};
+
 // Get all operations
 router.get('/', async (req, res) => {
   try {
@@ -29,6 +62,7 @@ router.get('/', async (req, res) => {
     // Optimization: Fetch all shoes in a single query instead of N+1 queries
     const operationIds = operations.map((op: any) => op.id);
     let shoesMap: Map<string, any[]> = new Map();
+    const retailItemsMap = await getRetailItemsByOperationIds(operationIds);
 
     if (operationIds.length > 0) {
       const placeholders = operationIds.map(() => '?').join(',');
@@ -56,6 +90,7 @@ router.get('/', async (req, res) => {
         id: shoe.id,
         category: shoe.category,
         color: shoe.color,
+        colorDescription: shoe.color_description || '',
         notes: shoe.notes,
         services: [{
           id: shoe.service_id,
@@ -63,7 +98,8 @@ router.get('/', async (req, res) => {
           price: shoe.price,
           basePrice: shoe.service_base_price
         }]
-      }))
+      })),
+      retailItems: retailItemsMap.get(operation.id) || []
     }));
 
     res.json(operationsWithShoes.map(transformOperation));
@@ -104,6 +140,7 @@ router.get('/:id', async (req, res) => {
         id: shoe.id,
         category: shoe.category,
         color: shoe.color,
+        colorDescription: shoe.color_description || '',
         notes: shoe.notes,
         services: [{
           id: shoe.service_id,
@@ -111,7 +148,8 @@ router.get('/:id', async (req, res) => {
           price: shoe.price,
           basePrice: shoe.service_base_price
         }]
-      }))
+      })),
+      retailItems: (await getRetailItemsByOperationIds([id])).get(id) || []
     };
 
     res.json(transformOperation(operationWithShoes));
@@ -141,22 +179,41 @@ router.get('/:id/payments', async (req, res) => {
 // Create new operation
 router.post('/', async (req, res) => {
   console.log('Received operation request:', JSON.stringify(req.body, null, 2));
-  const { customer, shoes, status, totalAmount, discount, isNoCharge, isDoOver, isDelivery, isPickup, notes, promisedDate, created_by } = req.body;
+  const {
+    customer,
+    shoes = [],
+    retailItems = [],
+    status,
+    totalAmount,
+    discount,
+    isNoCharge,
+    isDoOver,
+    isDelivery,
+    isPickup,
+    notes,
+    promisedDate,
+    created_by,
+  } = req.body;
   const now = new Date().toISOString();
+  const normalizedShoes = Array.isArray(shoes) ? shoes : [];
+  const normalizedRetailItems = Array.isArray(retailItems) ? retailItems : [];
+  const finalTotalAmount = Number(totalAmount) || 0;
+  const discountAmount = Number(discount) || 0;
+  let generatedDocumentId: string | null = null;
 
   if (!customer || !customer.id) {
     console.error('Invalid customer data:', customer);
     return res.status(400).json({ error: 'Invalid customer data' });
   }
 
-  if (!Array.isArray(shoes) || shoes.length === 0) {
-    console.error('Invalid shoes data:', shoes);
-    return res.status(400).json({ error: 'Invalid shoes data' });
+  if (normalizedShoes.length === 0 && normalizedRetailItems.length === 0) {
+    console.error('Invalid operation items:', { shoes, retailItems });
+    return res.status(400).json({ error: 'At least one repair or retail item is required' });
   }
 
   try {
     await db.run('BEGIN TRANSACTION');
-    
+
     try {
       // Insert the operation
       const operationId = uuidv4();
@@ -172,8 +229,8 @@ router.post('/', async (req, res) => {
         operationId,
         customer.id,
         status || 'pending',
-        totalAmount || 0,
-        discount || 0,
+        finalTotalAmount,
+        discountAmount,
         notes || null,
         promisedDate || null,
         isNoCharge ? 1 : 0,
@@ -186,21 +243,22 @@ router.post('/', async (req, res) => {
       );
 
       // Insert each shoe
-      for (let index = 0; index < shoes.length; index++) {
-        const shoe = shoes[index];
+      for (let index = 0; index < normalizedShoes.length; index++) {
+        const shoe = normalizedShoes[index];
         console.log(`Processing shoe ${index + 1}:`, JSON.stringify(shoe, null, 2));
         const shoeId = uuidv4();
-        
+
         await db.prepare(`
           INSERT INTO operation_shoes (
-            id, operation_id, category, shoe_size, color, notes, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            id, operation_id, category, shoe_size, color, color_description, notes, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           shoeId,
           operationId,
           shoe.category,
           shoe.size || null,
           shoe.color || null,
+          shoe.colorDescription || null,
           shoe.notes || null,
           now,
           now
@@ -211,7 +269,7 @@ router.post('/', async (req, res) => {
           for (let sIndex = 0; sIndex < shoe.services.length; sIndex++) {
             const service = shoe.services[sIndex];
             console.log(`Processing service ${sIndex + 1} for shoe ${index + 1}:`, JSON.stringify(service, null, 2));
-            
+
             if (!service.service_id) {
               throw new Error(`Missing service_id for service ${sIndex + 1} of shoe ${index + 1}`);
             }
@@ -235,6 +293,33 @@ router.post('/', async (req, res) => {
         }
       }
 
+      // Insert retail items for this operation
+      for (let index = 0; index < normalizedRetailItems.length; index++) {
+        const item = normalizedRetailItems[index];
+        const quantity = Math.max(1, Number(item.quantity) || 1);
+        const unitPrice = Number(item.unitPrice);
+        const totalPrice = Number(item.totalPrice) || unitPrice * quantity;
+
+        if (!item.productName || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+          throw new Error(`Invalid retail item at position ${index + 1}`);
+        }
+
+        await db.prepare(`
+          INSERT INTO operation_retail_items (
+            id, operation_id, product_id, product_name, unit_price, quantity, total_price, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          uuidv4(),
+          operationId,
+          item.productId || null,
+          item.productName,
+          unitPrice,
+          quantity,
+          totalPrice,
+          now
+        );
+      }
+
       // Return the created operation with all related data
       const operation = await db.prepare(`
         SELECT 
@@ -251,6 +336,7 @@ router.post('/', async (req, res) => {
       const operationShoes = await db.prepare(`
         SELECT * FROM operation_shoes WHERE operation_id = ?
       `).all(operationId);
+      const operationRetailItems = (await getRetailItemsByOperationIds([operationId])).get(operationId) || [];
 
       // Get services for each shoe
       const shoesWithServices = [];
@@ -286,16 +372,40 @@ router.post('/', async (req, res) => {
       `).run(now, customer.id);
 
       await db.run('COMMIT');
-      
-      res.json({
+
+      // Auto-generate invoice since no payment was made yet
+      try {
+        const invoiceId = uuidv4();
+        const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+        await db.prepare(`
+          INSERT INTO invoices (
+            id, operation_id, type, invoice_number, customer_name, customer_phone,
+            subtotal, discount, total, amount_paid, payment_method, notes,
+            promised_date, generated_by, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          invoiceId, operationId, 'invoice', invoiceNumber,
+          customer.name, customer.phone || '',
+          finalTotalAmount + discountAmount, discountAmount, finalTotalAmount,
+          0, null, notes || null, promisedDate || null, created_by || null, now, now
+        );
+        generatedDocumentId = invoiceId;
+      } catch (err) {
+        console.error('Failed to auto-generate invoice:', err);
+      }
+
+      res.json(transformOperation({
         ...operation,
         shoes: shoesWithServices,
+        retailItems: operationRetailItems,
         isNoCharge: Boolean(operation.is_no_charge),
         isDoOver: Boolean(operation.is_do_over),
         isDelivery: Boolean(operation.is_delivery),
         isPickup: Boolean(operation.is_pickup),
-        discount: operation.discount || 0
-      });
+        discount: operation.discount || 0,
+        generatedDocumentId,
+        generatedDocumentType: generatedDocumentId ? 'invoice' : null,
+      }));
     } catch (error) {
       await db.run('ROLLBACK');
       throw error;
@@ -312,7 +422,7 @@ router.patch('/:id', async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
     const now = new Date().toISOString();
-    
+
     const setClauses = Object.keys(updates)
       .map(key => {
         const dbKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
@@ -320,22 +430,22 @@ router.patch('/:id', async (req, res) => {
       })
       .concat(['updated_at = ?'])
       .join(', ');
-    
+
     const values = [...Object.values(updates), now, id];
-    
+
     await db.prepare(`
       UPDATE operations
       SET ${setClauses}
       WHERE id = ?
     `).run(...values);
-    
+
     const operation = await db.prepare(`
       SELECT o.*, c.name as customer_name, c.phone as customer_phone
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.id = ?
     `).get(id);
-    
+
     res.json(transformOperation(operation));
   } catch (error) {
     res.status(500).json({ error: 'Failed to update operation' });
@@ -353,7 +463,12 @@ router.post('/:id/payments', async (req, res) => {
     }
 
     // Get operation
-    const operation = await db.get('SELECT * FROM operations WHERE id = ?', [id]);
+    const operation = await db.get(`
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone
+      FROM operations o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.id = ?
+    `, [id]);
     if (!operation) {
       return res.status(404).json({ error: 'Operation not found' });
     }
@@ -392,9 +507,71 @@ router.post('/:id/payments', async (req, res) => {
 
     await db.run('COMMIT');
 
+    let generatedDocumentId: string | null = null;
+    let generatedDocumentType: 'invoice' | 'receipt' | null = null;
+
+    // Auto-generate receipt if fully paid
+    if (newPaidAmount >= (operation as any).total_amount) {
+      try {
+        // Check if receipt already exists
+        const existingReceipt = await db.get(
+          'SELECT id FROM invoices WHERE operation_id = ? AND type = ?',
+          [id, 'receipt']
+        );
+        if (!existingReceipt) {
+          const invoiceId = uuidv4();
+          const invoiceNumber = `RCP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+          await db.prepare(`
+            INSERT INTO invoices (
+              id, operation_id, type, invoice_number, customer_name, customer_phone,
+              subtotal, discount, total, amount_paid, payment_method, notes,
+              promised_date, generated_by, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            invoiceId, id, 'receipt', invoiceNumber,
+            (operation as any).customer_name || '', (operation as any).customer_phone || '',
+            (operation as any).total_amount + ((operation as any).discount || 0),
+            (operation as any).discount || 0,
+            (operation as any).total_amount,
+            newPaidAmount,
+            payments[0]?.method || null,
+            (operation as any).notes,
+            (operation as any).promised_date,
+            null, now, now
+          );
+          generatedDocumentId = invoiceId;
+        } else {
+          generatedDocumentId = (existingReceipt as any).id;
+        }
+        generatedDocumentType = 'receipt';
+      } catch (err) {
+        console.error('Failed to auto-generate receipt:', err);
+      }
+    } else {
+      const existingInvoice = await db.get(
+        'SELECT id FROM invoices WHERE operation_id = ? AND type = ?',
+        [id, 'invoice']
+      );
+      if (existingInvoice) {
+        generatedDocumentId = (existingInvoice as any).id;
+        generatedDocumentType = 'invoice';
+      }
+    }
+
     // Return updated operation
-    const updatedOperation = await db.get('SELECT * FROM operations WHERE id = ?', [id]);
-    res.json(transformOperation(updatedOperation));
+    const updatedOperation = await db.get(`
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone
+      FROM operations o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.id = ?
+    `, [id]);
+    const retailItems = (await getRetailItemsByOperationIds([id])).get(id) || [];
+    res.json(transformOperation({
+      ...updatedOperation,
+      retailItems,
+      generatedDocumentId,
+      generatedDocumentType,
+    }));
 
   } catch (error) {
     await db.run('ROLLBACK');

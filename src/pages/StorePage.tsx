@@ -7,7 +7,8 @@ import {
   faTicket, faSearch, faBoxesStacked, faWarehouse, faHandshake,
   faTruckFast, faMoneyBillTransfer,
   faCheckCircle,
-  faTriangleExclamation, faCoins, faChartLine
+  faTriangleExclamation, faCoins, faChartLine,
+  faPercent, faUserPlus, faTrophy, faStar, faCreditCard, faMoneyBillWave
 } from '@fortawesome/free-solid-svg-icons';
 
 export default function StorePage() {
@@ -76,13 +77,14 @@ export default function StorePage() {
   );
 
   const operations = [
-    { label: 'All Tickets', icon: faTicket, path: '/tickets', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:border-indigo-500 hover:bg-indigo-500/20' },
-    { label: 'Ticket Search', icon: faSearch, path: '/ticket-search', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:border-purple-500 hover:bg-purple-500/20' },
-    { label: 'Assembly', icon: faBoxesStacked, path: '/assembly', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:border-blue-500 hover:bg-blue-500/20' },
-    { label: 'Racking', icon: faWarehouse, path: '/racking', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:border-amber-500 hover:bg-amber-500/20' },
-    { label: 'Pickup Order', icon: faHandshake, path: '/pickup-order', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:border-rose-500 hover:bg-rose-500/20' },
-    { label: 'Deliveries', icon: faTruckFast, path: '/deliveries', color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 hover:border-cyan-500 hover:bg-cyan-500/20' },
-    { label: 'COD Payment', icon: faMoneyBillTransfer, path: '/cod-payment', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:border-emerald-500 hover:bg-emerald-500/20' }
+    { label: 'Code Payment', icon: faMoneyBillTransfer, path: '/cod-payment', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:border-emerald-500 hover:bg-emerald-500/20' },
+    { label: 'Total Discounts', icon: faPercent, path: '/discounts', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20 hover:border-purple-500 hover:bg-purple-500/20' },
+    { label: 'New Customers', icon: faUserPlus, path: '/new-customers', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:border-indigo-500 hover:bg-indigo-500/20' },
+    { label: 'Stock Levels', icon: faBoxesStacked, path: '/stock-levels', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:border-blue-500 hover:bg-blue-500/20' },
+    { label: 'Customer Rankings', icon: faTrophy, path: '/customer-rankings', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:border-amber-500 hover:bg-amber-500/20' },
+    { label: 'Most Performing Service', icon: faStar, path: '/most-performing', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:border-rose-500 hover:bg-rose-500/20' },
+    { label: 'Credit List', icon: faCreditCard, path: '/credit-list', color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20 hover:border-cyan-500 hover:bg-cyan-500/20' },
+    { label: 'Unpaid Balances', icon: faMoneyBillWave, path: '/unpaid-balances', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20 hover:border-orange-500 hover:bg-orange-500/20' }
   ];
 
   const actionNeeded = [

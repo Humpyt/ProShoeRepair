@@ -2254,24 +2254,38 @@ export default function DropPage() {
                           })
                         });
 
-                        if (!invoiceRes.ok) {
-                          const err = await invoiceRes.json();
-                          // If invoice already exists, use that ID
-                          if (err.invoiceId) {
-                            await fetch(`http://localhost:3000/api/invoices/${err.invoiceId}/print`, {
-                              method: 'POST'
-                            });
-                            toast.success(`${createdInvoiceType === 'receipt' ? 'Receipt' : 'Invoice'} printed`);
-                          } else {
-                            toast.error(err.error || 'Failed to create invoice');
-                          }
-                        } else {
+                        let invoiceId = null;
+
+                        if (invoiceRes.ok) {
+                          // New invoice created successfully
                           const invoice = await invoiceRes.json();
-                          // Now print with the invoice ID
-                          await fetch(`http://localhost:3000/api/invoices/${invoice.id}/print`, {
+                          invoiceId = invoice.id;
+                        } else {
+                          // Check if invoice already exists
+                          const err = await invoiceRes.json();
+                          if (err && err.invoiceId) {
+                            // Use existing invoice
+                            invoiceId = err.invoiceId;
+                          } else {
+                            // Real error
+                            toast.error(err?.error || 'Failed to create invoice');
+                            setShowSuccessModal(false);
+                            setCreatedOperationId(null);
+                            return;
+                          }
+                        }
+
+                        // Now print with the invoice ID
+                        if (invoiceId) {
+                          const printRes = await fetch(`http://localhost:3000/api/invoices/${invoiceId}/print`, {
                             method: 'POST'
                           });
-                          toast.success(`${createdInvoiceType === 'receipt' ? 'Receipt' : 'Invoice'} printed`);
+                          const printData = await printRes.json();
+                          if (printData.success) {
+                            toast.success(printData.simulated ? 'Print simulated (no printer)' : 'Receipt printed');
+                          } else {
+                            toast.error(printData.error || 'Print failed');
+                          }
                         }
                       } catch (error) {
                         console.error('Print error:', error);

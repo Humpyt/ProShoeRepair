@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, TrendingDown, DollarSign, Calendar, BarChart3, Activity, Users, Trophy, Award, Zap } from 'lucide-react';
+import { Target, TrendingUp, TrendingDown, Calendar, BarChart3, Activity, Users, Trophy, Award, Zap } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useAuthStore } from '../store/authStore';
 
@@ -117,9 +117,38 @@ const StaffPerformanceDashboard: React.FC<{
     );
   }
 
-  // Add safety checks for nested properties
-  const dailyPerf = staffPerformance.dailyPerformance || { color: 'red', percentage: 0, total: 0, target: 1000000, deficit: 1000000, surplus: null };
-  const monthlyPerf = staffPerformance.monthlyPerformance || { color: 'red', percentage: 0, total: 0, target: 26000000, deficit: 26000000, surplus: null };
+  // Recalculate with hardcoded rules:
+  // Daily: 1,000,000. Red (0-300k), Orange (300k-800k), Green (800k+)
+  // Monthly: 26,000,000. Red (0-10m), Orange (10m-20m), Green (20m+)
+  const dTotal = staffPerformance?.dailyPerformance?.total || 0;
+  const mTotal = staffPerformance?.monthlyPerformance?.total || 0;
+  
+  const dailyTarget = 1000000;
+  const dPercentage = (dTotal / dailyTarget) * 100;
+  const dailyColor = dTotal < 300000 ? 'red' : dTotal < 800000 ? 'orange' : 'green';
+
+  const monthlyTarget = 26000000;
+  const mPercentage = (mTotal / monthlyTarget) * 100;
+  const monthlyColor = mTotal < 10000000 ? 'red' : mTotal < 20000000 ? 'orange' : 'green';
+
+  const dailyPerf = {
+    total: dTotal,
+    target: dailyTarget,
+    percentage: dPercentage,
+    color: dailyColor,
+    deficit: dTotal < dailyTarget ? dailyTarget - dTotal : null,
+    surplus: dTotal > dailyTarget ? dTotal - dailyTarget : null,
+  };
+
+  const monthlyPerf = {
+    total: mTotal,
+    target: monthlyTarget,
+    percentage: mPercentage,
+    color: monthlyColor,
+    deficit: mTotal < monthlyTarget ? monthlyTarget - mTotal : null,
+    surplus: mTotal > monthlyTarget ? mTotal - monthlyTarget : null,
+  };
+  
   const commission = staffPerformance.commission || { currentTier: 1, rateDisplay: '1%', estimatedCommission: 0, nextTierThreshold: null, progressToNextTier: null };
   const dailyStats = dailyData?.statistics || { averageDailySales: 0, daysAtTarget: 0, totalDays: 0, totalMonthlySales: 0, percentageOfTarget: 0 };
   const dailyBreakdown = dailyData?.dailyBreakdown || [];
@@ -168,224 +197,155 @@ const StaffPerformanceDashboard: React.FC<{
 
   return (
     <div className="space-y-6">
-      {/* Motivational Banner */}
-      <div className={`p-4 rounded-lg border-2 ${motivationalContent.bgColor} border-current`}>
-        <div className="flex items-center gap-3">
-          <Zap className={`w-6 h-6 ${motivationalContent.textColor}`} />
-          <p className={`text-lg font-semibold ${motivationalContent.textColor}`}>
+      {/* Motivational Banner - Elegant Glassmorphic */}
+      <div className={`relative rounded-2xl p-4 overflow-hidden ${motivationalContent.bgColor}`}>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+        <div className="relative flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${motivationalContent.bgColor}`}>
+            <Zap className={`w-5 h-5 ${motivationalContent.textColor}`} />
+          </div>
+          <p className={`text-sm font-medium ${motivationalContent.textColor}`}>
             {motivationalContent.message}
           </p>
         </div>
       </div>
 
-      {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Circular Monthly Progress */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 card-bevel flex flex-col items-center justify-center">
-          <h3 className="text-lg font-semibold text-white mb-4">Monthly Progress</h3>
-          <div className="relative">
-            <svg className="w-40 h-40 transform -rotate-90">
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                stroke="currentColor"
-                strokeWidth="10"
-                fill="transparent"
-                className="text-gray-700"
-              />
-              <circle
-                cx="80"
-                cy="80"
-                r="70"
-                stroke="currentColor"
-                strokeWidth="10"
-                fill="transparent"
-                strokeDasharray={`${2 * Math.PI * 70}`}
-                strokeDashoffset={`${2 * Math.PI * 70 * (1 - Math.min(staffPerformance?.monthlyPerformance?.percentage || 0, 100) / 100)}`}
-                className={monthlyColors.text}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-bold text-white">
-                {monthlyPerf.percentage.toFixed(0)}%
-              </span>
-              <span className="text-xs text-gray-400">
-                {formatCurrency(monthlyPerf.total)}
-              </span>
-            </div>
+      {/* Main Dashboard Grid - Compact Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Monthly Progress - Compact Circular */}
+        <div className="relative rounded-2xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <BarChart3 className={monthlyColors.text} size={18} />
+            <h3 className="text-sm font-semibold text-white">Monthly</h3>
           </div>
-          <div className="mt-4 text-center">
-            <p className="text-sm text-gray-400">Target: {formatCurrency(monthlyPerf.target)}</p>
-            <p className={`text-sm font-semibold ${monthlyColors.text}`}>
-              {monthlyPerf.deficit !== null
-                ? `Need: ${formatCurrency(monthlyPerf.deficit)} more`
-                : monthlyPerf.surplus !== null
-                ? `Surplus: ${formatCurrency(monthlyPerf.surplus)}`
-                : 'On track!'
-              }
-            </p>
-          </div>
-        </div>
-
-        {/* Daily Progress Card */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 card-bevel">
-          <div className="flex items-center gap-2 mb-4">
-            <Target className={dailyColors.text} size={24} />
-            <h3 className="text-lg font-semibold text-white">Today's Target</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div className="bg-gray-700 rounded-lg p-4 text-center">
-              <p className="text-sm text-gray-400 mb-1">Today's Sales</p>
-              <p className={`text-3xl font-bold ${dailyColors.text}`}>
-                {formatCurrency(dailyPerf.total)}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Target</span>
-                <span className="text-white">{formatCurrency(dailyPerf.target)}</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-4">
-                <div
-                  className={`h-4 rounded-full transition-all ${dailyColors.bg}`}
-                  style={{ width: `${Math.min(dailyPerf.percentage, 100)}%` }}
+          <div className="flex items-center justify-center">
+            <div className="relative w-32 h-32">
+              <svg className="w-32 h-32 transform -rotate-90">
+                <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-gray-700/50" />
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="56"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  fill="transparent"
+                  strokeDasharray={`${2 * Math.PI * 56}`}
+                  strokeDashoffset={`${2 * Math.PI * 56 * (1 - Math.min(staffPerformance?.monthlyPerformance?.percentage || 0, 100) / 100)}`}
+                  className={`${monthlyColors.text} transition-all duration-1000`}
+                  strokeLinecap="round"
                 />
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Progress</span>
-                <span className={`font-bold ${dailyColors.text}`}>
-                  {dailyPerf.percentage.toFixed(1)}%
-                </span>
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-2xl font-bold text-white">{monthlyPerf.percentage.toFixed(0)}%</span>
+                <span className="text-[10px] text-gray-400">{formatCurrency(monthlyPerf.total)}</span>
               </div>
             </div>
-
-            {dailyPerf.deficit !== null && (
-              <div className="p-3 rounded-lg bg-red-500/20 border border-red-500">
-                <div className="flex items-center gap-2 text-red-400">
-                  <TrendingDown size={16} />
-                  <span className="text-sm font-medium">
-                    Need: {formatCurrency(dailyPerf.deficit)} more
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {dailyPerf.surplus !== null && (
-              <div className="p-3 rounded-lg bg-green-500/20 border border-green-500">
-                <div className="flex items-center gap-2 text-green-400">
-                  <TrendingUp size={16} />
-                  <span className="text-sm font-medium">
-                    Exceeded by: {formatCurrency(dailyPerf.surplus)}
-                  </span>
-                </div>
-              </div>
-            )}
+          </div>
+          <div className="mt-2 text-center">
+            <p className="text-xs text-gray-400">Target: {formatCurrency(monthlyPerf.target)}</p>
           </div>
         </div>
 
-        {/* Commission Calculator */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 card-bevel">
-          <div className="flex items-center gap-2 mb-4">
-            <Trophy className="text-yellow-400" size={24} />
-            <h3 className="text-lg font-semibold text-white">Commission</h3>
+        {/* Daily Progress Card - Compact */}
+        <div className="relative rounded-2xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Target className={dailyColors.text} size={18} />
+            <h3 className="text-sm font-semibold text-white">Today</h3>
+            <span className={`ml-auto text-xs font-bold ${dailyColors.text}`}>{dailyPerf.percentage.toFixed(0)}%</span>
           </div>
 
-          <div className="space-y-4">
-            <div className="bg-gray-700 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-1">Current Tier</p>
-              <div className="flex items-center justify-between">
-                <p className="text-2xl font-bold text-white">Tier {commission.currentTier}</p>
-                <Award className="text-yellow-400" size={32} />
-              </div>
-              <p className={`text-lg font-semibold ${monthlyColors.text} mt-2`}>
-                {commission.rateDisplay}
-              </p>
-            </div>
+          <div className="text-center mb-3">
+            <p className={`text-2xl font-bold ${dailyColors.text}`}>{formatCurrency(dailyPerf.total)}</p>
+            <p className="text-xs text-gray-400">of {formatCurrency(dailyPerf.target)}</p>
+          </div>
 
-            <div className="bg-gray-700 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-1">Estimated Earnings</p>
-              <p className="text-3xl font-bold text-green-400">
-                {formatCurrency(commission.estimatedCommission)}
-              </p>
-            </div>
+          <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden mb-2">
+            <div className={`h-full rounded-full transition-all ${dailyColors.bg}`} style={{ width: `${Math.min(dailyPerf.percentage, 100)}%` }} />
+          </div>
 
-            {commission.nextTierThreshold && (
-              <div className="p-3 rounded-lg bg-indigo-500/20 border border-indigo-500">
-                <p className="text-sm text-indigo-300">
-                  {formatCurrency(commission.progressToNextTier)} to Tier {commission.currentTier + 1}
-                </p>
-              </div>
-            )}
+          {dailyPerf.deficit !== null && (
+            <div className="flex items-center justify-center gap-1 text-xs text-red-400">
+              <TrendingDown size={12} />
+              <span>Need {formatCurrency(dailyPerf.deficit)}</span>
+            </div>
+          )}
+          {dailyPerf.surplus !== null && (
+            <div className="flex items-center justify-center gap-1 text-xs text-emerald-400">
+              <TrendingUp size={12} />
+              <span>+{formatCurrency(dailyPerf.surplus)}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Commission - Compact */}
+        <div className="relative rounded-2xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Trophy className="text-yellow-400" size={18} />
+            <h3 className="text-sm font-semibold text-white">Commission</h3>
+          </div>
+
+          <div className="text-center mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 mb-2">
+              <Award size={14} className="text-yellow-400" />
+              <span className="text-sm font-bold text-yellow-400">Tier {commission.currentTier}</span>
+            </div>
+            <p className="text-xl font-bold text-white">{commission.rateDisplay}</p>
+          </div>
+
+          <div className="text-center">
+            <p className="text-xs text-gray-400 mb-1">Est. Earnings</p>
+            <p className="text-xl font-bold text-emerald-400">{formatCurrency(commission.estimatedCommission)}</p>
           </div>
         </div>
       </div>
 
-      {/* Daily Breakdown */}
-      <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 card-bevel">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <BarChart3 className="text-indigo-400" size={24} />
-            My Daily Breakdown
-          </h2>
+      {/* Statistics Row - Compact */}
+      <div className="grid grid-cols-4 gap-3">
+        <div className="rounded-xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Avg Daily</p>
+          <p className="text-sm font-bold text-white">{formatCurrency(dailyStats.averageDailySales)}</p>
         </div>
-
-        {/* Statistics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-700 rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-400">Avg Daily</p>
-            <p className="text-lg font-bold text-white">
-              {formatCurrency(dailyStats.averageDailySales)}
-            </p>
-          </div>
-          <div className="bg-gray-700 rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-400">Days at Target</p>
-            <p className="text-lg font-bold text-green-400">
-              {dailyStats.daysAtTarget} / {dailyStats.totalDays}
-            </p>
-          </div>
-          <div className="bg-gray-700 rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-400">Total Sales</p>
-            <p className="text-lg font-bold text-white">
-              {formatCurrency(dailyStats.totalMonthlySales)}
-            </p>
-          </div>
-          <div className="bg-gray-700 rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-400">% of Target</p>
-            <p className={`text-lg font-bold ${
-              dailyStats.percentageOfTarget >= 100 ? 'text-green-400' :
-              dailyStats.percentageOfTarget >= 80 ? 'text-orange-400' :
-              'text-red-400'
-            }`}>
-              {dailyStats.percentageOfTarget.toFixed(0)}%
-            </p>
-          </div>
+        <div className="rounded-xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Days Hit</p>
+          <p className="text-sm font-bold text-emerald-400">{dailyStats.daysAtTarget}/{dailyStats.totalDays}</p>
         </div>
+        <div className="rounded-xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Total</p>
+          <p className="text-sm font-bold text-white">{formatCurrency(dailyStats.totalMonthlySales)}</p>
+        </div>
+        <div className="rounded-xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-3 text-center">
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">% Target</p>
+          <p className={`text-sm font-bold ${dailyStats.percentageOfTarget >= 100 ? 'text-emerald-400' : dailyStats.percentageOfTarget >= 80 ? 'text-orange-400' : 'text-red-400'}`}>
+            {dailyStats.percentageOfTarget.toFixed(0)}%
+          </p>
+        </div>
+      </div>
 
-        {/* Daily Progress Bars */}
-        <div className="space-y-2 max-h-96 overflow-y-auto">
+      {/* Daily Breakdown - Minimal Bars */}
+      <div className="relative rounded-2xl bg-gray-800/60 backdrop-blur-xl border border-white/10 overflow-hidden">
+        <div className="px-5 py-3 border-b border-white/5">
+          <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+            <BarChart3 className="text-indigo-400" size={16} />
+            Daily Breakdown
+          </h3>
+        </div>
+        <div className="max-h-64 overflow-y-auto custom-scrollbar">
           {dailyBreakdown.map((day, index) => {
             const colors = getColorClasses(day.color);
             const date = new Date(day.date);
-            const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const formattedDate = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
             return (
-              <div key={index} className="flex items-center gap-3">
-                <span className="w-16 text-sm text-gray-400 text-right">{formattedDate}</span>
-                <div className="flex-1 bg-gray-700 rounded-full h-5 relative">
+              <div key={index} className="flex items-center gap-3 px-5 py-2 hover:bg-white/5 transition-colors">
+                <span className="w-20 text-xs text-gray-400">{formattedDate}</span>
+                <div className="flex-1 h-2 bg-gray-700/30 rounded-full overflow-hidden">
                   <div
-                    className={`h-5 rounded-full transition-all ${colors.bg} flex items-center justify-end pr-2`}
+                    className={`h-full rounded-full transition-all ${colors.bg}`}
                     style={{ width: `${Math.min(day.percentage, 100)}%` }}
-                  >
-                    <span className="text-xs font-semibold text-white">
-                      {formatCurrency(day.total)}
-                    </span>
-                  </div>
+                  />
                 </div>
-                <div className={`w-3 h-3 rounded-full ${colors.bg}`} title={day.color.toUpperCase()} />
+                <span className="w-20 text-xs font-medium text-right text-gray-300">{formatCurrency(day.total)}</span>
+                <div className={`w-2 h-2 rounded-full ${colors.bg}`} />
               </div>
             );
           })}
@@ -468,30 +428,44 @@ const BusinessTargetsPage: React.FC = () => {
           setAllStaffPerformance(allStaff);
         } else {
           // Staff: Fetch only personal performance data
-          const [staffRes, dailyRes] = await Promise.all([
-            fetch(`http://localhost:3000/api/business/targets/staff/${user?.id}`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-              }
-            }),
-            fetch('http://localhost:3000/api/business/targets/daily', {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-              }
-            })
-          ]);
+          const staffRes = await fetch(`http://localhost:3000/api/business/targets/staff/${user?.id}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            }
+          });
 
-          if (!staffRes.ok || !dailyRes.ok) {
+          if (!staffRes.ok) {
             throw new Error('Failed to fetch performance data');
           }
 
-          const [staff, daily] = await Promise.all([
-            staffRes.json(),
-            dailyRes.json(),
-          ]);
+          const staff = await staffRes.json();
 
-          setStaffPerformance(staff);
-          setDailyData(daily);
+          // Transform staff response to match frontend expectations
+          // The individual staff endpoint returns nested structure
+          const transformedStaff: StaffPerformance = {
+            ...staff.staff,
+            dailyPerformance: staff.todayPerformance,
+            monthlyPerformance: staff.monthlyPerformance,
+            commission: staff.commission,
+            targets: staff.targets
+          };
+
+          // Use dailyBreakdown from staff endpoint, not separate /daily call
+          const transformedDaily = {
+            dailyBreakdown: staff.dailyBreakdown || [],
+            statistics: {
+              averageDailySales: staff.dailyBreakdown?.length > 0
+                ? staff.dailyBreakdown.reduce((sum: number, day: any) => sum + day.total, 0) / staff.dailyBreakdown.length
+                : 0,
+              daysAtTarget: staff.dailyBreakdown?.filter((day: any) => day.total >= staff.targets.daily).length || 0,
+              totalDays: staff.dailyBreakdown?.length || 0,
+              totalMonthlySales: staff.monthlyPerformance?.total || 0,
+              percentageOfTarget: staff.monthlyPerformance?.percentage || 0
+            }
+          };
+
+          setStaffPerformance(transformedStaff);
+          setDailyData(transformedDaily);
         }
       } catch (err) {
         console.error('Error fetching business targets:', err);
@@ -524,100 +498,102 @@ const BusinessTargetsPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-            <Target className="text-indigo-400" size={32} />
-            {user?.role === 'admin' || user?.role === 'manager' ? 'Business Targets & Staff Performance' : 'My Performance'}
-          </h1>
-          <p className="text-gray-400 mt-1 flex items-center gap-2">
-            <Calendar size={16} />
-            {businessSummary?.period?.currentMonth || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-          </p>
+      {/* Header - Glassmorphic */}
+      <div className="relative rounded-2xl bg-gray-800/60 backdrop-blur-xl border border-white/10 p-6">
+        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 rounded-full bg-indigo-600/10 blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 rounded-full bg-purple-600/10 blur-3xl pointer-events-none"></div>
+
+        <div className="relative flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center">
+              <Target size={28} className="text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">
+                {user?.role === 'admin' || user?.role === 'manager' ? 'Business Targets' : 'My Performance'}
+              </h1>
+              <p className="text-gray-400 text-sm flex items-center gap-2">
+                <Calendar size={14} />
+                {businessSummary?.period?.currentMonth || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-gray-700/50 hover:bg-gray-600/50 border border-white/10 text-white rounded-xl flex items-center gap-2 transition-all backdrop-blur-sm"
+          >
+            <Activity size={18} />
+            Refresh
+          </button>
         </div>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-2 transition-colors"
-        >
-          <Activity size={18} />
-          Refresh
-        </button>
       </div>
 
       {/* Admin/Manager View: All Staff Performance */}
       {(user?.role === 'admin' || user?.role === 'manager') && businessSummary && allStaffPerformance && (
         <>
-          {/* Overall Business Target */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 card-bevel">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <BarChart3 className="text-indigo-400" size={24} />
-              Monthly Business Target
-            </h2>
+          {/* Overall Business Target - Glassmorphic Card */}
+          <div className="relative rounded-2xl bg-gray-800/60 backdrop-blur-xl border border-white/10 overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 rounded-full bg-indigo-600/10 blur-2xl pointer-events-none"></div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Circular Progress */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+              {/* Circular Progress - Elegant */}
               <div className="flex items-center justify-center">
                 <div className="relative">
-                  <svg className="w-48 h-48 transform -rotate-90">
+                  <svg className="w-40 h-40 transform -rotate-90">
                     <circle
-                      cx="96"
-                      cy="96"
-                      r="88"
+                      cx="80"
+                      cy="80"
+                      r="70"
                       stroke="currentColor"
-                      strokeWidth="12"
+                      strokeWidth="8"
                       fill="transparent"
-                      className="text-gray-700"
+                      className="text-gray-700/50"
                     />
                     <circle
-                      cx="96"
-                      cy="96"
-                      r="88"
+                      cx="80"
+                      cy="80"
+                      r="70"
                       stroke="currentColor"
-                      strokeWidth="12"
+                      strokeWidth="8"
                       fill="transparent"
-                      strokeDasharray={`${2 * Math.PI * 88}`}
-                      strokeDashoffset={`${2 * Math.PI * 88 * (1 - (businessSummary?.progress?.percentage || 0) / 100)}`}
-                      className={getColorClasses(businessSummary.progress.color).text}
+                      strokeDasharray={`${2 * Math.PI * 70}`}
+                      strokeDashoffset={`${2 * Math.PI * 70 * (1 - (businessSummary?.progress?.percentage || 0) / 100)}`}
+                      className={`${getColorClasses(businessSummary.progress.color).text} transition-all duration-1000`}
                       strokeLinecap="round"
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold text-white">
-                      {(businessSummary?.progress?.percentage || 0).toFixed(1)}%
+                    <span className="text-3xl font-bold text-white">
+                      {(businessSummary?.progress?.percentage || 0).toFixed(0)}%
                     </span>
-                    <span className="text-sm text-gray-400">Complete</span>
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">Progress</span>
                   </div>
                 </div>
               </div>
 
-              {/* Target Details */}
-              <div className="md:col-span-2 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-400">Monthly Target</p>
-                    <p className="text-2xl font-bold text-white">
-                      {formatCurrency(businessSummary.targets.businessMonthly)}
-                    </p>
+              {/* Stats - Compact Pills */}
+              <div className="md:col-span-2 flex flex-col justify-center gap-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-900/50 rounded-xl border border-white/5 p-4">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Target</p>
+                    <p className="text-xl font-bold text-white">{formatCurrency(104000000)}</p>
                   </div>
-                  <div className="bg-gray-700 rounded-lg p-4">
-                    <p className="text-sm text-gray-400">Current Sales</p>
-                    <p className="text-2xl font-bold text-white">
-                      {formatCurrency(businessSummary.current.totalSales)}
-                    </p>
+                  <div className="bg-gray-900/50 rounded-xl border border-white/5 p-4">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Achieved</p>
+                    <p className="text-xl font-bold text-emerald-400">{formatCurrency(businessSummary.current.totalSales)}</p>
                   </div>
                 </div>
 
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm text-gray-400">Remaining</p>
-                    <p className={`text-lg font-bold ${getColorClasses(businessSummary.progress.color).text}`}>
+                <div className="bg-gray-900/50 rounded-xl border border-white/5 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Remaining</p>
+                    <p className={`text-sm font-bold ${getColorClasses(businessSummary.progress.color).text}`}>
                       {formatCurrency(businessSummary.progress.remaining)}
                     </p>
                   </div>
-                  <div className="w-full bg-gray-600 rounded-full h-3">
+                  <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden">
                     <div
-                      className={`h-3 rounded-full transition-all ${getColorClasses(businessSummary.progress.color).bg}`}
+                      className={`h-full rounded-full transition-all ${getColorClasses(businessSummary.progress.color).bg}`}
                       style={{ width: `${businessSummary.progress.percentage}%` }}
                     />
                   </div>
@@ -626,75 +602,96 @@ const BusinessTargetsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* All Staff Performance */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 card-bevel">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <Users className="text-indigo-400" size={24} />
-              All Staff Performance
-            </h2>
+          {/* All Staff Performance - Compact Elegant Table */}
+          <div className="bg-gray-800/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 bg-gradient-to-r from-gray-800/80 to-gray-800/40 border-b border-white/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/20 flex items-center justify-center">
+                    <Users size={20} className="text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Staff Performance</h2>
+                    <p className="text-xs text-gray-400">{allStaffPerformance?.length || 0} team members</p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            <div className="grid gap-4">
+            {/* Table Header */}
+            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-900/50 text-xs font-medium text-gray-400 uppercase tracking-wider">
+              <div className="col-span-3">Staff</div>
+              <div className="col-span-2 text-center">Tier</div>
+              <div className="col-span-3 text-center">Today</div>
+              <div className="col-span-3 text-center">Month</div>
+              <div className="col-span-1 text-right">Commission</div>
+            </div>
+
+            {/* Staff Rows */}
+            <div className="divide-y divide-white/5">
               {allStaffPerformance && allStaffPerformance.length > 0 ? allStaffPerformance.map(staff => {
-                const dailyColors = getColorClasses(staff.daily_color);
-                const monthlyColors = getColorClasses(staff.monthly_color);
+                const curDSales = staff.today_sales || 0;
+                const dColor = curDSales < 300000 ? 'red' : curDSales < 800000 ? 'orange' : 'green';
+                const dailyColors = getColorClasses(dColor);
+
+                const curMSales = staff.monthly_sales || 0;
+                const mColor = curMSales < 10000000 ? 'red' : curMSales < 20000000 ? 'orange' : 'green';
+                const monthlyColors = getColorClasses(mColor);
+
+                const dailyPct = Math.min(((curDSales) / 1000000) * 100, 100);
+                const monthlyPct = Math.min(((curMSales) / 26000000) * 100, 100);
 
                 return (
-                  <div key={staff.id} className="bg-gray-700 rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">{staff.name}</h3>
-                        <p className="text-sm text-gray-400">{staff.email}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="text-center px-3 py-1 bg-gray-600 rounded-lg">
-                          <p className="text-xs text-gray-400">Tier</p>
-                          <p className="text-lg font-bold text-white">{staff.commission_tier}</p>
-                        </div>
-                        <div className="text-center px-3 py-1 bg-gray-600 rounded-lg">
-                          <p className="text-xs text-gray-400">Commission</p>
-                          <p className="text-lg font-bold text-green-400">{formatCurrency(staff.estimated_commission)}</p>
-                        </div>
+                  <div key={staff.id} className="grid grid-cols-12 gap-4 px-6 py-3 items-center hover:bg-white/5 transition-colors">
+                    {/* Staff Info */}
+                    <div className="col-span-3">
+                      <p className="text-sm font-medium text-white">{staff.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{staff.email}</p>
+                    </div>
+
+                    {/* Tier Badge */}
+                    <div className="col-span-2 flex justify-center">
+                      <div className={`px-3 py-1 rounded-full text-xs font-bold border ${
+                        staff.commission_tier === 3 ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                        staff.commission_tier === 2 ? 'bg-gray-500/20 text-gray-300 border-gray-500/30' :
+                        'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                      }`}>
+                        T{staff.commission_tier}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Daily Progress */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-400">Today</span>
-                          <span className={`text-sm font-bold ${dailyColors.text}`}>
-                            {formatCurrency(staff.today_sales)} / {formatCurrency(staff.daily_target)}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-600 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all ${dailyColors.bg}`}
-                            style={{ width: `${Math.min(staff.daily_percentage, 100)}%` }}
-                          />
-                        </div>
-                        <p className={`text-xs mt-1 ${dailyColors.text}`}>
-                          {staff.daily_percentage.toFixed(1)}%
-                        </p>
+                    {/* Daily Progress */}
+                    <div className="col-span-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">{formatCurrency(curDSales)}</span>
+                        <span className={`text-xs font-bold ${dailyColors.text}`}>{dailyPct.toFixed(0)}%</span>
                       </div>
+                      <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${dailyColors.bg}`}
+                          style={{ width: `${dailyPct}%` }}
+                        />
+                      </div>
+                    </div>
 
-                      {/* Monthly Progress */}
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-400">Month</span>
-                          <span className={`text-sm font-bold ${monthlyColors.text}`}>
-                            {formatCurrency(staff.monthly_sales)} / {formatCurrency(staff.monthly_target)}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-600 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all ${monthlyColors.bg}`}
-                            style={{ width: `${Math.min(staff.monthly_percentage, 100)}%` }}
-                          />
-                        </div>
-                        <p className={`text-xs mt-1 ${monthlyColors.text}`}>
-                          {staff.monthly_percentage.toFixed(1)}%
-                        </p>
+                    {/* Monthly Progress */}
+                    <div className="col-span-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">{formatCurrency(curMSales)}</span>
+                        <span className={`text-xs font-bold ${monthlyColors.text}`}>{monthlyPct.toFixed(0)}%</span>
                       </div>
+                      <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${monthlyColors.bg}`}
+                          style={{ width: `${monthlyPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Commission */}
+                    <div className="col-span-1 text-right">
+                      <span className="text-sm font-semibold text-emerald-400">{formatCurrency(staff.estimated_commission)}</span>
                     </div>
                   </div>
                 );

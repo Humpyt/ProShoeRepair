@@ -1,5 +1,9 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import db from '../database';
 
 const router = express.Router();
@@ -308,209 +312,168 @@ router.post('/:id/print', async (req, res) => {
       return `UGX ${amount.toLocaleString()}`;
     };
 
-    // Lazily load printer modules
-    let printerModule: any = null;
-    let escposModule: any = null;
-    try {
-      printerModule = await import('node-thermal-printer');
-    } catch (e) {
-      console.warn('Thermal printer module not available, will simulate print');
-    }
-    try {
-      escposModule = await import('escpos-usb');
-    } catch (e) {
-      console.warn('ESCUSB module not available, will simulate print');
-    }
+    // ESC/POS command helpers
+    const ESC = 0x1B;
+    const GS = 0x1D;
 
-    if (!printerModule || !printerModule.ThermalPrinter) {
-      // Simulate print for development without printer
-      console.log('========== SIMULATED PRINT ==========');
-      console.log(invoice.type === 'receipt' ? 'RECEIPT' : 'INVOICE');
-      console.log('SHOE REPAIR POS');
-      console.log('================================');
-      console.log(`Document #: ${invoice.invoice_number}`);
-      console.log(`Date: ${new Date(invoice.created_at).toLocaleDateString()}`);
-      console.log(`Customer: ${invoice.customer_name}`);
-      if (invoice.customer_phone) console.log(`Phone: ${invoice.customer_phone}`);
-      console.log('--------------------------------');
-      console.log(invoice.type === 'receipt' ? 'PAYMENT RECEIVED' : 'SERVICES / PRODUCTS');
-      console.log('--------------------------------');
-      if (shoes.length > 0) {
-        shoes.forEach((shoe: any) => {
-          console.log(`[${shoe.category}]`);
-          if (shoe.color) console.log(`  Color: ${shoe.color}`);
-          if (shoe.service_name) console.log(`${shoe.service_name}: ${formatCurrency(shoe.service_price)}`);
-          console.log('');
-        });
-      }
-      if (retailItems.length > 0) {
-        retailItems.forEach((item: any) => {
-          console.log(`${item.product_name}`);
-          console.log(`  Qty: ${item.quantity} x ${formatCurrency(item.unit_price)}`);
-          console.log(`Subtotal: ${formatCurrency(item.total_price)}`);
-        });
-      }
-      console.log('================================');
-      console.log(`Subtotal: ${formatCurrency(invoice.subtotal)}`);
-      if (invoice.discount > 0) console.log(`Discount: -${formatCurrency(invoice.discount)}`);
-      console.log(`TOTAL: ${formatCurrency(invoice.total)}`);
-      if (invoice.type === 'receipt') {
-        console.log('================================');
-        console.log('PAYMENT DETAILS');
-        console.log(`Amount Paid: ${formatCurrency(invoice.amount_paid)}`);
-        console.log(`Balance: ${formatCurrency(invoice.total - invoice.amount_paid)}`);
-      }
-      if (operation.promised_date) {
-        console.log(`Pickup Date: ${new Date(operation.promised_date).toLocaleDateString()}`);
-      }
-      console.log('================================');
-      console.log('Thank you for your business!');
-      console.log('========== END SIMULATED PRINT ==========');
-
-      return res.json({
-        success: true,
-        message: 'Printed successfully (simulated - no printer connected)',
-        simulated: true
-      });
-    }
-
-    const { ThermalPrinter } = printerModule;
-    const { USB } = escposModule || {};
-
-    // Printer configuration
-    const printerConfig = {
-      type: 'EPSON',
-      interface: 'printer:auto',
-      characterSet: 'PC437_USA',
-      width: 42
+    const cmd = {
+      init: Buffer.from([ESC, 0x40]),
+      alignCenter: Buffer.from([ESC, 0x61, 0x01]),
+      alignLeft: Buffer.from([ESC, 0x61, 0x00]),
+      boldOn: Buffer.from([ESC, 0x45, 0x01]),
+      boldOff: Buffer.from([ESC, 0x45, 0x00]),
+      normalSize: Buffer.from([ESC, 0x21, 0x00]),
+      doubleSize: Buffer.from([ESC, 0x21, 0x11]),
+      cut: Buffer.from([GS, 0x56, 0x00]),
+      feed: Buffer.from([ESC, 0x64, 0x03]),
     };
 
+    const text = (str: string) => Buffer.from(str + '\n', 'ascii');
+    const line = (char: string, width: number = 48) => Buffer.from(char.repeat(width) + '\n', 'ascii');
+    const padRight = (str: string, len: number) => str.padEnd(len).slice(0, len);
+    const padLeft = (str: string, len: number) => str.padStart(len).slice(0, len);
+
     try {
-      // Create printer instance
-      const printer = new ThermalPrinter(printerConfig);
+      // Build print data
+      const chunks: Buffer[] = [];
 
-      // Print header
-      printer.alignCenter();
-      printer.bold(true);
-      printer.setTextSize(1, 1);
-      printer.println(invoice.type === 'receipt' ? 'RECEIPT' : 'INVOICE');
-      printer.bold(false);
-      printer.setTextSize(0, 0);
-      printer.println('================================');
-      printer.println('SHOE REPAIR POS');
-      printer.println('================================');
-      printer.newLine();
+      // Initialize
+      chunks.push(cmd.init);
 
-      // Print document details
-      printer.alignLeft();
-      printer.bold(true);
-      printer.println(`Document #: ${invoice.invoice_number}`);
-      printer.bold(false);
-      printer.println(`Date: ${new Date(invoice.created_at).toLocaleDateString()}`);
-      printer.println(`Customer: ${invoice.customer_name}`);
+      // Header
+      chunks.push(cmd.alignCenter, cmd.boldOn, cmd.doubleSize);
+      chunks.push(text(invoice.type === 'receipt' ? 'RECEIPT' : 'INVOICE'));
+      chunks.push(cmd.boldOff, cmd.normalSize);
+      chunks.push(text('SHOE REPAIR POS'));
+      chunks.push(line('='));
+
+      // Document info
+      chunks.push(cmd.alignLeft);
+      chunks.push(cmd.boldOn);
+      chunks.push(text(`Doc #: ${invoice.invoice_number}`));
+      chunks.push(cmd.boldOff);
+      chunks.push(text(`Date: ${new Date(invoice.created_at).toLocaleDateString()}`));
+      chunks.push(text(`Customer: ${invoice.customer_name}`));
       if (invoice.customer_phone) {
-        printer.println(`Phone: ${invoice.customer_phone}`);
+        chunks.push(text(`Phone: ${invoice.customer_phone}`));
       }
-      printer.println('--------------------------------');
+      chunks.push(line('-'));
 
-      // Print items header
-      printer.bold(true);
-      printer.println(invoice.type === 'receipt' ? 'PAYMENT RECEIVED' : 'SERVICES / PRODUCTS');
-      printer.bold(false);
-      printer.newLine();
+      // Items header
+      chunks.push(cmd.boldOn);
+      chunks.push(text(invoice.type === 'receipt' ? 'PAYMENT RECEIVED' : 'SERVICES / PRODUCTS'));
+      chunks.push(cmd.boldOff);
+      chunks.push(text(''));
 
-      // Print repair items (services)
+      // Print repair items
       if (shoes.length > 0) {
-        shoes.forEach((shoe: any) => {
-          printer.println(`[${shoe.category}]`);
-          if (shoe.color) {
-            printer.println(`  Color: ${shoe.color}`);
-          }
+        for (const shoe of shoes) {
+          chunks.push(text(`[${shoe.category}]`));
+          if (shoe.color) chunks.push(text(`  Color: ${shoe.color}`));
           if (shoe.service_name) {
-            printer.alignRight();
-            printer.println(`${shoe.service_name}: ${formatCurrency(shoe.service_price)}`);
-            printer.alignLeft();
+            const priceStr = formatCurrency(shoe.service_price);
+            const lineStr = `${padRight(shoe.service_name, 30)}${padLeft(priceStr, 18)}`;
+            chunks.push(text(lineStr));
           }
-          printer.newLine();
-        });
+          chunks.push(text(''));
+        }
       }
 
       // Print retail items
       if (retailItems.length > 0) {
-        printer.println('--------------------------------');
-        retailItems.forEach((item: any) => {
-          printer.println(`${item.product_name}`);
-          printer.println(`  Qty: ${item.quantity} x ${formatCurrency(item.unit_price)}`);
-          printer.alignRight();
-          printer.println(`Subtotal: ${formatCurrency(item.total_price)}`);
-          printer.alignLeft();
-        });
-        printer.newLine();
+        chunks.push(line('-'));
+        for (const item of retailItems) {
+          chunks.push(text(item.product_name));
+          const priceStr = formatCurrency(item.total_price);
+          const qtyStr = `  Qty: ${item.quantity} x ${formatCurrency(item.unit_price)}`;
+          chunks.push(text(qtyStr));
+          const totalLine = `${padRight('', 30)}${padLeft(priceStr, 18)}`;
+          chunks.push(text(totalLine));
+        }
+        chunks.push(text(''));
       }
 
-      // Print totals
-      printer.println('================================');
-      printer.println(`Subtotal: ${formatCurrency(invoice.subtotal)}`);
+      // Totals
+      chunks.push(line('='));
+      chunks.push(text(`${padRight('Subtotal:', 30)}${padLeft(formatCurrency(invoice.subtotal), 18)}`));
       if (invoice.discount > 0) {
-        printer.println(`Discount: -${formatCurrency(invoice.discount)}`);
+        chunks.push(text(`${padRight('Discount:', 30)}${padLeft('-' + formatCurrency(invoice.discount), 18)}`));
       }
-      printer.bold(true);
-      printer.println(`TOTAL: ${formatCurrency(invoice.total)}`);
-      printer.bold(false);
+      chunks.push(cmd.boldOn);
+      chunks.push(text(`${padRight('TOTAL:', 30)}${padLeft(formatCurrency(invoice.total), 18)}`));
+      chunks.push(cmd.boldOff);
 
-      // Print payment info for receipts
+      // Payment info for receipts
       if (invoice.type === 'receipt') {
-        printer.newLine();
-        printer.println('================================');
-        printer.println('PAYMENT DETAILS');
-        printer.println(`Amount Paid: ${formatCurrency(invoice.amount_paid)}`);
+        chunks.push(text(''));
+        chunks.push(line('='));
+        chunks.push(text('PAYMENT DETAILS'));
+        chunks.push(text(`${padRight('Amount Paid:', 30)}${padLeft(formatCurrency(invoice.amount_paid), 18)}`));
         const balance = invoice.total - invoice.amount_paid;
         if (balance > 0) {
-          printer.println(`Balance Due: ${formatCurrency(balance)}`);
-        } else {
-          printer.println(`Balance: ${formatCurrency(0)}`);
-        }
-
-        // Print payment methods
-        if (payments && payments.length > 0) {
-          printer.newLine();
-          payments.forEach((p: any) => {
-            printer.println(`Payment (${p.payment_method}): ${formatCurrency(p.amount)}`);
-          });
+          chunks.push(text(`${padRight('Balance Due:', 30)}${padLeft(formatCurrency(balance), 18)}`));
         }
       }
 
-      // Print promised date if exists
+      // Pickup date
       if (operation.promised_date) {
-        printer.newLine();
-        printer.alignCenter();
-        printer.println(`Pickup Date: ${new Date(operation.promised_date).toLocaleDateString()}`);
+        chunks.push(text(''));
+        chunks.push(cmd.alignCenter);
+        chunks.push(text(`Pickup Date: ${new Date(operation.promised_date).toLocaleDateString()}`));
       }
 
       // Footer
-      printer.alignCenter();
-      printer.newLine();
-      printer.println('================================');
-      printer.println('Thank you for your business!');
-      printer.println('Please retain this receipt');
-      printer.println('================================');
-      printer.cut();
+      chunks.push(cmd.alignCenter);
+      chunks.push(text(''));
+      chunks.push(line('='));
+      chunks.push(text('Thank you for your business!'));
+      chunks.push(line('='));
+      chunks.push(cmd.feed);
+      chunks.push(cmd.cut);
 
-      // Execute print
-      if (!USB) {
-        return res.status(500).json({ error: 'USB printer not detected. Please check that the printer is connected and powered on.' });
-      }
-      const device = new USB();
-      await printer.execute(device);
+      // Combine all buffers
+      const printData = Buffer.concat(chunks);
+
+      // Write to temp file and print via PowerShell
+      const tempFile = path.join(os.tmpdir(), `receipt_${Date.now()}.bin`);
+      fs.writeFileSync(tempFile, printData);
+
+      // Use PowerShell to copy binary data to USB001
+      const escapedTempFile = tempFile.replace(/\\/g, '\\\\');
+      const psCommand = `[System.IO.File]::ReadAllBytes('${escapedTempFile}') | Set-Content -Path '\\\\.\\USB001' -Encoding Byte -PassThru | Out-Null; exit 0`;
+
+      await new Promise<void>((resolve, reject) => {
+        const ps = spawn('powershell', [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy', 'Bypass',
+          '-Command', psCommand
+        ], { windowsHide: true });
+
+        ps.on('close', (code) => {
+          try { fs.unlinkSync(tempFile); } catch {}
+          if (code === 0) {
+            console.log('Print successful via USB001');
+            resolve();
+          } else {
+            reject(new Error(`Print command exited with code ${code}`));
+          }
+        });
+        ps.on('error', (err) => {
+          try { fs.unlinkSync(tempFile); } catch {}
+          reject(err);
+        });
+      });
+
       res.json({ success: true, message: 'Printed successfully' });
-    } catch (printError: any) {
-      console.error('Printer error:', printError);
-      return res.status(500).json({ error: `Print failed: ${printError.message}. Please check printer connection.` });
+      return;
+    } catch (error: any) {
+      console.error('Print error:', error);
+      return res.status(500).json({ error: `Print failed: ${error.message}` });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to print invoice:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    res.status(500).json({ error: `Print failed: ${message}` });
+    res.status(500).json({ error: `Print failed: ${error.message}` });
   }
 });
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, PlusCircle, Briefcase, Mail, Target, TrendingUp, AlertCircle, LayoutGrid, LayoutList, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, PlusCircle, Briefcase, Mail, Target, TrendingUp, AlertCircle, LayoutGrid, LayoutList, Loader2, Trophy } from 'lucide-react';
 import type { Staff } from '../types';
 import StaffModal from './StaffModal';
 import StaffTargetModal from './StaffTargetModal';
@@ -25,6 +26,7 @@ const transformUserToStaff = (user: any, performance: any): Staff => ({
 });
 
 export function Staff() {
+  const navigate = useNavigate();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,16 +60,19 @@ export function Staff() {
         }
 
         const users = await usersResponse.json();
-        const performances = await performanceResponse.json();
+        const performanceData = await performanceResponse.json();
 
-        // Create a map of user_id to performance data
+        // Extract the staff array from the response
+        const performances = performanceData.staff || [];
+
+        // Create a map of userId to performance data
         const performanceMap = new Map(
-          performances.map((p: any) => [p.user_id, p])
+          performances.map((p: any) => [p.userId, p])
         );
 
-        // Transform users to Staff format
+        // Transform users to Staff format (exclude "Staff One" test user)
         const transformedStaff = users
-          .filter((user: any) => user.status === 'active') // Only show active staff
+          .filter((user: any) => user.status === 'active' && user.name !== 'Staff One' && user.id !== 'staff-001') // Only show active staff, exclude test user
           .map((user: any) => transformUserToStaff(user, performanceMap.get(user.id)));
 
         setStaff(transformedStaff);
@@ -188,19 +193,17 @@ export function Staff() {
             <div className="mt-4">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-medium text-gray-300">Daily Target Progress</span>
-                <span className={`text-sm font-medium ${
-                  progressPercentage >= 100 ? 'text-green-500' :
-                  progressPercentage >= 90 ? 'text-yellow-500' : 'text-red-500'
-                }`}>
+                <span className={`text-sm font-medium ${progressPercentage >= 100 ? 'text-green-500' :
+                    progressPercentage >= 90 ? 'text-yellow-500' : 'text-red-500'
+                  }`}>
                   {progressPercentage}%
                 </span>
               </div>
               <div className="w-full bg-gray-700 rounded-full h-2">
                 <div
-                  className={`h-2 rounded-full ${
-                    progressPercentage >= 100 ? 'bg-green-500' :
-                    progressPercentage >= 90 ? 'bg-yellow-500' : 'bg-red-500'
-                  }`}
+                  className={`h-2 rounded-full ${progressPercentage >= 100 ? 'bg-green-500' :
+                      progressPercentage >= 90 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
                   style={{ width: `${Math.min(progressPercentage, 100)}%` }}
                 ></div>
               </div>
@@ -226,6 +229,13 @@ export function Staff() {
                 <TrendingUp className="h-4 w-4 mr-1" />
                 Update Progress
               </button>
+              <button
+                onClick={() => navigate(`/commissions?staff=${member.id}&name=${encodeURIComponent(member.name)}`)}
+                className="text-sm text-yellow-400 hover:text-yellow-300 flex items-center"
+              >
+                <Trophy className="h-4 w-4 mr-1" />
+                Commissions
+              </button>
             </div>
           </div>
         );
@@ -248,7 +258,7 @@ export function Staff() {
                 <div className="text-sm text-gray-400">{member.email}</div>
               </div>
             </div>
-            
+
             <div className="flex items-center">
               <div>
                 <div className="text-white capitalize">{member.role}</div>
@@ -273,10 +283,9 @@ export function Staff() {
               <div className="flex-1">
                 <div className="w-full bg-gray-700 rounded-full h-2">
                   <div
-                    className={`h-2 rounded-full ${
-                      progressPercentage >= 100 ? 'bg-green-500' :
-                      progressPercentage >= 90 ? 'bg-yellow-500' : 'bg-red-500'
-                    }`}
+                    className={`h-2 rounded-full ${progressPercentage >= 100 ? 'bg-green-500' :
+                        progressPercentage >= 90 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
                     style={{ width: `${Math.min(progressPercentage, 100)}%` }}
                   ></div>
                 </div>
@@ -284,7 +293,7 @@ export function Staff() {
               <div className="text-sm whitespace-nowrap">
                 <span className={
                   progressPercentage >= 100 ? 'text-green-500' :
-                  progressPercentage >= 90 ? 'text-yellow-500' : 'text-red-500'
+                    progressPercentage >= 90 ? 'text-yellow-500' : 'text-red-500'
                 }>
                   {progressPercentage}%
                 </span>
@@ -292,6 +301,13 @@ export function Staff() {
             </div>
 
             <div className="flex items-center gap-2 justify-end">
+              <button
+                onClick={() => navigate(`/commissions?staff=${member.id}&name=${encodeURIComponent(member.name)}`)}
+                className="text-yellow-400 hover:text-yellow-300 flex items-center text-sm"
+              >
+                <Trophy className="h-4 w-4 mr-1" />
+                Commissions
+              </button>
               <button
                 onClick={() => {
                   setSelectedStaff(member);

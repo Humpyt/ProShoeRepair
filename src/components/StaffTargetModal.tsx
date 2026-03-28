@@ -19,10 +19,23 @@ export function StaffTargetModal({ isOpen, onClose, onSave, staff, dailyTarget }
     }
   }, [staff]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (staff) {
-      onSave(staff.id, progress);
+      try {
+        const token = localStorage.getItem('auth_token');
+        await fetch(`http://localhost:3000/api/business/targets/staff/${staff.id}/targets`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ daily_target: progress })
+        });
+        onSave(staff.id, progress);
+      } catch (error) {
+        console.error('Failed to update target:', error);
+      }
     }
   };
 

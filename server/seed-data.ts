@@ -84,3 +84,48 @@ export async function seedProductsAndCategories() {
     throw error;
   }
 }
+
+export async function seedColors() {
+  try {
+    console.log('Seeding colors...');
+
+    // Check if already seeded
+    const existingColors = await db.prepare('SELECT COUNT(*) as count FROM colors').get();
+    if (existingColors && (existingColors as any).count > 0) {
+      console.log('Colors already seeded');
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    // Insert default colors
+    const colors = [
+      { id: 'beige', name: 'Beige', hex_code: '#F5F5DC', display_order: 1 },
+      { id: 'black', name: 'Black', hex_code: '#000000', display_order: 2 },
+      { id: 'blue', name: 'Blue', hex_code: '#0000FF', display_order: 3 },
+      { id: 'brown', name: 'Brown', hex_code: '#8B4513', display_order: 4 },
+      { id: 'burgundy', name: 'Burgundy', hex_code: '#800000', display_order: 5 },
+      { id: 'gray', name: 'Gray', hex_code: '#808080', display_order: 6 },
+      { id: 'green', name: 'Green', hex_code: '#008000', display_order: 7 },
+      { id: 'multi', name: 'Multi', hex_code: '#RAINBOW', display_order: 8 },
+      { id: 'navy', name: 'Navy', hex_code: '#000080', display_order: 9 },
+      { id: 'orange', name: 'Orange', hex_code: '#FFA500', display_order: 10 },
+      { id: 'pink', name: 'Pink', hex_code: '#FFC0CB', display_order: 11 },
+      { id: 'red', name: 'Red', hex_code: '#FF0000', display_order: 12 },
+      { id: 'white', name: 'White', hex_code: '#FFFFFF', display_order: 13 },
+      { id: 'yellow', name: 'Yellow', hex_code: '#FFFF00', display_order: 14 },
+    ];
+
+    for (const color of colors) {
+      await db.prepare(`
+        INSERT INTO colors (id, name, hex_code, display_order, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+      `).run(color.id, color.name, color.hex_code, color.display_order, now, now);
+    }
+
+    console.log('Colors seeded successfully');
+  } catch (error) {
+    console.error('Error seeding colors:', error);
+    throw error;
+  }
+}

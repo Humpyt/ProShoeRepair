@@ -42,6 +42,7 @@ tsx server/add_services.ts       # Add sample service data
 **Service management:**
 ```bash
 npm run import:services          # Import services from pricing.txt to database
+npm run cleanup:services         # Remove duplicate services from database
 ```
 
 ## Architecture
@@ -103,6 +104,24 @@ npm run import:services          # Import services from pricing.txt to database
 - Entry point: `src/App.tsx`
 - Online/offline detection built-in with status indicator
 
+**Key pages:**
+- `/tickets` - Main tickets/repair orders list
+- `/ticket-search` - Search tickets by various criteria
+- `/drop` - New repair order drop-off
+- `/assembly`, `/racking` - Workshop workflow stages
+- `/pickup-order`, `/pickup` - Customer pickup processing
+- `/deliveries` - Delivery management
+- `/cod-payment` - Cash on delivery payments
+- `/balances` - Overdue/unpaid balances
+- `/commissions` - Staff commission tracking
+- `/business-targets` - Staff performance targets
+- `/expenses` - Business expense tracking
+- `/supplies` - Supply inventory management
+- `/sales` - Retail sales
+- `/invoices` - Invoice management
+- `/reports` - Analytics and reporting
+- `/marketing` - Customer communications
+
 **API integration:** Backend via Vite proxy:
 - Vite dev server proxies `/api` requests to `http://localhost:3000`
 - Direct fetch/axios calls to backend endpoints
@@ -111,9 +130,9 @@ npm run import:services          # Import services from pricing.txt to database
 - Material-UI (`@mui/material`) for base components
 - Tailwind CSS for styling
 - Radix UI for select/switch/toast components
-- Lucide React icons
+- FontAwesome icons (`@fortawesome/free-solid-svg-icons`) - used alongside Lucide
 - React Hot Toast for notifications
-- React Chart.js 2 for analytics
+- React Chart.js 2 and Recharts for analytics
 
 **Utility functions:**
 - `src/utils/formatCurrency.ts` - Currency formatting using UGX locale
@@ -129,6 +148,11 @@ npm run import:services          # Import services from pricing.txt to database
 - **Thermal printing:** Integration with thermal printers via USB
 - **Role-based access:** Admin-only routes (staff page, admin page)
 - **Reports:** Analytics dashboard with charts
+- **Expenses:** Track and manage business expenses
+- **Commissions:** Staff commission tracking and management
+- **Credits:** Customer credit list management
+- **Invoices:** Invoice generation and management
+- **Marketing:** Customer communication and campaign management
 
 ## Important Notes
 
@@ -143,23 +167,23 @@ npm run import:services          # Import services from pricing.txt to database
 
 3. **Database location:** SQLite database file at `server/database.db` - created automatically on first server run.
 
-3. **Transaction handling:** Backend uses manual BEGIN TRANSACTION / COMMIT / ROLLBACK for multi-step database operations. The database module also provides a transaction wrapper function.
+4. **Transaction handling:** Backend uses manual BEGIN TRANSACTION / COMMIT / ROLLBACK for multi-step database operations. The database module also provides a transaction wrapper function.
 
-4. **Column naming convention:** SQLite uses snake_case (e.g., `customer_id`), but TypeScript interfaces use camelCase. A transformer utility (`server/utils.ts`) converts between formats.
+5. **Column naming convention:** SQLite uses snake_case (e.g., `customer_id`), but TypeScript interfaces use camelCase. A transformer utility (`server/utils.ts`) converts between formats.
 
-5. **Database promisification:** The sqlite3 callback-based API is promisified in `server/database.ts` for async/await usage.
+6. **Database promisification:** The sqlite3 callback-based API is promisified in `server/database.ts` for async/await usage.
 
-6. **Printer support:** Uses `escpos` and `node-thermal-printer` packages for USB thermal printer integration.
+7. **Printer support:** Uses `escpos` and `node-thermal-printer` packages for USB thermal printer integration.
 
-7. **Image uploads:** Images are converted to base64 data URLs for local storage (no cloud storage required).
+8. **Image uploads:** Images are converted to base64 data URLs for local storage (no cloud storage required).
 
-8. **Online/offline detection:** App automatically detects network status and shows offline indicator when disconnected.
+9. **Online/offline detection:** App automatically detects network status and shows offline indicator when disconnected.
 
-9. **Error handling:** Frontend uses `ErrorBoundary` component for catching React errors; backend has error middleware at the end of the Express middleware chain.
+10. **Error handling:** Frontend uses `ErrorBoundary` component for catching React errors; backend has error middleware at the end of the Express middleware chain.
 
-10. **Deployment:** Configured for Netlify (see `netlify.toml`). Note that the Express backend won't work on Netlify - it's designed for local development or a separate Node.js hosting.
+11. **Deployment:** Configured for Netlify (see `netlify.toml`) and PM2 for VPS deployment. The Express backend requires a separate Node.js hosting - it won't work on Netlify's serverless functions.
 
-11. **TypeScript:** Uses project references (tsconfig.app.json, tsconfig.node.json) for better type checking across frontend and backend.
+12. **TypeScript:** Uses project references (tsconfig.app.json, tsconfig.node.json) for better type checking across frontend and backend.
 
 ## Database Schema Relationships
 

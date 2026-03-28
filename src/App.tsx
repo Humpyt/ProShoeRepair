@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Routes, Route, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -24,7 +24,6 @@ import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import ErrorBoundary from './components/ErrorBoundary';
 import MainMenu from './components/MainMenu';
-import RightSidebar from './components/RightSidebar';
 import QuickActionButtons from './components/QuickActionButtons';
 import ProtectedRoute from './components/ProtectedRoute';
 import { CustomerProvider } from './contexts/CustomerContext';
@@ -33,6 +32,8 @@ import { AdminProvider } from './contexts/AdminContext';
 import { CartProvider } from './contexts/CartContext';
 import { ProductProvider } from './contexts/ProductContext';
 import { ServiceProvider } from './contexts/ServiceContext';
+import { StaffMessageProvider } from './contexts/StaffMessageContext';
+import { RetailProductProvider } from './contexts/RetailProductContext';
 import { useAuthStore } from './store/authStore';
 import { Navigate } from 'react-router-dom';
 import NoChargeDoOverPage from './pages/NoChargeDoOverPage';
@@ -43,6 +44,17 @@ import PickupOrderPage from './pages/PickupOrderPage';
 import DeliveriesPage from './pages/DeliveriesPage';
 import CodPaymentPage from './pages/CodPaymentPage';
 import ProductCategoryManager from './pages/ProductCategoryManager';
+import ExpensesPage from './pages/ExpensesPage';
+import ReadyToPickPage from './pages/ReadyToPickPage';
+import CommissionsPage from './pages/CommissionsPage';
+import InvoicesPage from './pages/InvoicesPage';
+import UnpaidBalancesPage from './pages/UnpaidBalancesPage';
+import DiscountsPage from './pages/DiscountsPage';
+import NewCustomersPage from './pages/NewCustomersPage';
+import StockLevelsPage from './pages/StockLevelsPage';
+import CustomerRankingsPage from './pages/CustomerRankingsPage';
+import MostPerformingPage from './pages/MostPerformingPage';
+import CreditListPage from './pages/CreditListPage';
 
 const Layout = ({ isSidebarCollapsed, toggleSidebar }: { isSidebarCollapsed: boolean; toggleSidebar: () => void }) => {
   return (
@@ -136,8 +148,10 @@ function App() {
             <AdminProvider>
               <CartProvider>
                 <ProductProvider>
-                  <ServiceProvider>
-                    <Routes>
+                  <RetailProductProvider>
+                    <ServiceProvider>
+                      <StaffMessageProvider>
+                      <Routes>
                     {/* Root route - redirect based on authentication */}
                     <Route
                       path="/"
@@ -202,6 +216,11 @@ function App() {
                           <SuppliesPage />
                         </ProtectedRoute>
                       } />
+                      <Route path="expenses" element={
+                        <ProtectedRoute permission="view_reports" requiredRoles={['admin', 'manager']}>
+                          <ExpensesPage />
+                        </ProtectedRoute>
+                      } />
                       <Route path="sales" element={
                         <ProtectedRoute permission="view_sales">
                           <SalesPage />
@@ -252,9 +271,25 @@ function App() {
                       <Route path="pickup-order" element={<PickupOrderPage />} />
                       <Route path="deliveries" element={<DeliveriesPage />} />
                       <Route path="cod-payment" element={<CodPaymentPage />} />
+                      <Route path="ready-to-pick" element={<ReadyToPickPage />} />
+                      <Route path="commissions" element={<CommissionsPage />} />
+                      <Route path="unpaid-balances" element={<UnpaidBalancesPage />} />
+                      <Route path="discounts" element={<DiscountsPage />} />
+                      <Route path="new-customers" element={<NewCustomersPage />} />
+                      <Route path="stock-levels" element={<StockLevelsPage />} />
+                      <Route path="customer-rankings" element={<CustomerRankingsPage />} />
+                      <Route path="most-performing" element={<MostPerformingPage />} />
+                      <Route path="credit-list" element={<CreditListPage />} />
+                      <Route path="invoices" element={
+                        <ProtectedRoute requiredRoles={['admin', 'manager']}>
+                          <InvoicesPage />
+                        </ProtectedRoute>
+                      } />
                     </Route>
-                    </Routes>
-                  </ServiceProvider>
+                      </Routes>
+                      </StaffMessageProvider>
+                    </ServiceProvider>
+                  </RetailProductProvider>
                 </ProductProvider>
               </CartProvider>
             </AdminProvider>
