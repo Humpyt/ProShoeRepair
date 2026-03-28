@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, User, Search, Star, Percent, Phone, Mail, Palette, Scissors, Settings, Edit2, Trash2, FolderOpen, CheckCircle, DollarSign, CreditCard, Calendar } from 'lucide-react';
+import { X, Plus, User, Search, Star, Percent, Phone, Mail, Palette, Scissors, Settings, Edit2, Trash2, FolderOpen, CheckCircle, DollarSign, CreditCard, Calendar, Clock, Package, Printer, ShoppingBag } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
+import toast from 'react-hot-toast';
 import type { Customer } from '../types';
 import { useCustomer } from '../contexts/CustomerContext';
 import { useOperation } from '../contexts/OperationContext';
 import { useServices, type Service } from '../contexts/ServiceContext';
 import { useAuthStore } from '../store/authStore';
+import { useRetailProducts, type RetailProduct } from '../contexts/RetailProductContext';
 import ServiceCRUDModal, { ServiceFormData } from '../components/ServiceCRUDModal';
 import CategoryManagerModal from '../components/CategoryManagerModal';
 import { PaymentModal } from '../components/PaymentModal';
+import ProductSalesSection from '../components/drop/ProductSalesSection';
+import ProductCRUDModal from '../components/drop/ProductCRUDModal';
 
 interface ItemCategory {
   id: string;
@@ -19,7 +23,8 @@ interface ItemCategory {
 interface ColorOption {
   id: string;
   name: string;
-  bgClass: string;
+  hexCode: string;
+  isRainbow?: boolean;
 }
 
 interface ShoeItem {
@@ -27,6 +32,7 @@ interface ShoeItem {
   category: string;
   description: string;
   color: string;
+  colorDescription: string;
   size: string;
   services: {
     service_id: string;
@@ -36,6 +42,17 @@ interface ShoeItem {
     notes: string | null;
   }[];
   manualPrice?: number;
+}
+
+interface RetailCartItem {
+  id: string;
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  totalPrice: number;
+  image_url?: string;
+  icon?: string;
 }
 
 interface CustomerModalProps {
@@ -58,23 +75,6 @@ const categories: ItemCategory[] = [
   { id: 'mens-riding', name: "Men's Riding", icon: '🥾' },
   { id: 'bag', name: "Bag", icon: '👜' },
   { id: 'other', name: "Other", icon: '🔧' }
-];
-
-const colors: ColorOption[] = [
-  { id: 'beige', name: 'Beige', bgClass: 'bg-[#F5F5DC]' },
-  { id: 'black', name: 'Black', bgClass: 'bg-black' },
-  { id: 'blue', name: 'Blue', bgClass: 'bg-blue-600' },
-  { id: 'brown', name: 'Brown', bgClass: 'bg-amber-800' },
-  { id: 'burgundy', name: 'Burgundy', bgClass: 'bg-red-900' },
-  { id: 'gray', name: 'Gray', bgClass: 'bg-gray-500' },
-  { id: 'green', name: 'Green', bgClass: 'bg-green-600' },
-  { id: 'multi', name: 'Multi', bgClass: 'bg-gradient-to-r from-red-500 via-green-500 to-blue-500' },
-  { id: 'navy', name: 'Navy', bgClass: 'bg-blue-900' },
-  { id: 'orange', name: 'Orange', bgClass: 'bg-orange-500' },
-  { id: 'pink', name: 'Pink', bgClass: 'bg-pink-500' },
-  { id: 'red', name: 'Red', bgClass: 'bg-red-600' },
-  { id: 'white', name: 'White', bgClass: 'bg-white' },
-  { id: 'yellow', name: 'Yellow', bgClass: 'bg-yellow-400' }
 ];
 
 const shoeSizes = [
@@ -144,7 +144,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
     address: '',
     notes: '',
   });
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     if (isOpen && initialData) {
@@ -167,22 +167,22 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
   }, [isOpen, initialData]);
 
   const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
-    
+    const newErrors: { [key: string]: string } = {};
+
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     }
-    
+
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required';
     } else if (!/^\+?\d{10,}$/.test(formData.phone.replace(/[-\s]/g, ''))) {
       newErrors.phone = 'Please enter a valid phone number';
     }
-    
+
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Please enter a valid email address';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -224,7 +224,7 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
           <h2 className="text-xl font-semibold">
             {initialData ? 'Edit Customer' : 'Add New Customer'}
           </h2>
-          <button 
+          <button
             onClick={onClose}
             className="text-gray-400 hover:text-white transition-colors"
           >
@@ -240,9 +240,8 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
               type="text"
               value={formData.name}
               onChange={handleInputChange('name')}
-              className={`w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
-                errors.name ? 'border-red-500' : ''
-              }`}
+              className={`w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${errors.name ? 'border-red-500' : ''
+                }`}
               placeholder="Enter customer name"
             />
             {errors.name && (
@@ -257,9 +256,8 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
               type="tel"
               value={formData.phone}
               onChange={handleInputChange('phone')}
-              className={`w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
-                errors.phone ? 'border-red-500' : ''
-              }`}
+              className={`w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${errors.phone ? 'border-red-500' : ''
+                }`}
               placeholder="Enter phone number"
             />
             {errors.phone && (
@@ -272,9 +270,8 @@ const CustomerModal: React.FC<CustomerModalProps> = ({ isOpen, onClose, onSave, 
               type="email"
               value={formData.email}
               onChange={handleInputChange('email')}
-              className={`w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${
-                errors.email ? 'border-red-500' : ''
-              }`}
+              className={`w-full bg-gray-700 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none ${errors.email ? 'border-red-500' : ''
+                }`}
               placeholder="Enter email address"
             />
             {errors.email && (
@@ -329,9 +326,11 @@ export default function DropPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [customCategoryName, setCustomCategoryName] = useState<string>('');
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [colorDescription, setColorDescription] = useState<string>('');
   const [sizeInput, setSizeInput] = useState<string>('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [shoes, setShoes] = useState<ShoeItem[]>([]);
+  const [retailItems, setRetailItems] = useState<RetailCartItem[]>([]);
   const [operationStatus, setOperationStatus] = useState<'none' | 'hold' | 'save'>('none');
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -344,14 +343,40 @@ export default function DropPage() {
   const [manualPrice, setManualPrice] = useState<string>('');
   const [useManualPrice, setUseManualPrice] = useState<boolean>(false);
   const [promisedDate, setPromisedDate] = useState<string>('');
+  const [promisedTime, setPromisedTime] = useState<string>('17:00');
+  const [cartPriceOverride, setCartPriceOverride] = useState<number | null>(null);
+  const [showPriceOverrideModal, setShowPriceOverrideModal] = useState(false);
+  const [priceOverrideInput, setPriceOverrideInput] = useState<string>('');
+
+  // Success modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdOperationId, setCreatedOperationId] = useState<string | null>(null);
+  const [createdInvoiceType, setCreatedInvoiceType] = useState<'invoice' | 'receipt'>('invoice');
 
   // Admin mode state
   const [adminMode, setAdminMode] = useState(false);
   const [serviceModalOpen, setServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [colors, setColors] = useState<ColorOption[]>([]);
 
-  const filteredCustomers = customers.filter(customer => 
+  // Fetch colors from API
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch('/api/colors');
+        if (response.ok) {
+          const data = await response.json();
+          setColors(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch colors:', error);
+      }
+    };
+    fetchColors();
+  }, []);
+
+  const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
     customer.phone.includes(customerSearchTerm) ||
     customer.email?.toLowerCase().includes(customerSearchTerm.toLowerCase())
@@ -452,6 +477,7 @@ export default function DropPage() {
         category: `other-${customCategoryName.trim().toLowerCase().replace(/\s+/g, '-')}`,
         description: customCategoryName.trim(),
         color: selectedColor || 'none',
+        colorDescription: colorDescription,
         size: '',
         services: [{
           service_id: 'custom-manual-price',
@@ -469,6 +495,7 @@ export default function DropPage() {
       setManualPrice('');
       setUseManualPrice(false);
       setSelectedColor(null);
+      setColorDescription('');
       setSizeInput('');
       return;
     }
@@ -506,6 +533,7 @@ export default function DropPage() {
       category: selectedCategory === 'other' ? `other-${customCategoryName.trim().toLowerCase().replace(/\s+/g, '-')}` : selectedCategory,
       description: description,
       color: selectedColor || 'none',
+      colorDescription: colorDescription,
       size: needsSize(selectedCategory) ? sizeInput.trim() : '',
       services: shoeServices,
     };
@@ -514,6 +542,7 @@ export default function DropPage() {
     setSelectedCategory(null);
     setCustomCategoryName('');
     setSelectedColor(null);
+    setColorDescription('');
     setSizeInput('');
     setSelectedServices([]);
   };
@@ -569,8 +598,40 @@ export default function DropPage() {
     setShoes(shoes.filter(shoe => shoe.id !== shoeId));
   };
 
+  const handleAddRetailItemToCart = (product: RetailProduct, customPrice?: number) => {
+    const unitPrice = customPrice ?? product.default_price;
+    const newItem: RetailCartItem = {
+      id: `retail-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      productId: product.id,
+      productName: product.name,
+      unitPrice: unitPrice,
+      quantity: 1,
+      totalPrice: unitPrice,
+      image_url: product.image_url,
+      icon: product.icon,
+    };
+    setRetailItems(prev => [...prev, newItem]);
+    toast.success(`Added ${product.name} to cart`);
+  };
+
+  const handleRemoveRetailItem = (id: string) => {
+    setRetailItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleUpdateRetailItemQuantity = (id: string, quantity: number) => {
+    if (quantity < 1) {
+      handleRemoveRetailItem(id);
+      return;
+    }
+    setRetailItems(prev => prev.map(item => item.id === id ? { ...item, quantity } : item));
+  };
+
   const calculateTotal = () => {
-    const subtotal = shoes.reduce((total, shoe) => {
+    // If cart price override is set, use it directly
+    if (cartPriceOverride !== null) {
+      return Math.max(0, cartPriceOverride - discountAmount);
+    }
+    const shoeSubtotal = shoes.reduce((total, shoe) => {
       // Use manual price if available, otherwise sum service prices
       if (shoe.manualPrice) {
         return total + shoe.manualPrice;
@@ -580,7 +641,10 @@ export default function DropPage() {
       }, 0);
       return total + shoeTotal;
     }, 0);
-    return Math.max(0, subtotal - discountAmount);
+    const retailSubtotal = retailItems.reduce((total, item) => {
+      return total + (item.totalPrice || item.unitPrice * item.quantity);
+    }, 0);
+    return Math.max(0, shoeSubtotal + retailSubtotal - discountAmount);
   };
 
   // Calculate tentative ready date based on max estimated_days from services
@@ -615,6 +679,11 @@ export default function DropPage() {
   // Admin helper functions
   const isAdmin = useAuthStore(state => state.user?.role === 'admin');
   const { addService, updateService, deleteService, refreshServices } = useServices();
+  const { createProduct, updateProduct, deleteProduct } = useRetailProducts();
+
+  // Product modal state
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<RetailProduct | null>(null);
 
   const handleAddService = () => {
     setEditingService(null);
@@ -650,6 +719,35 @@ export default function DropPage() {
       setEditingService(null);
     } catch (error) {
       console.error('Failed to save service:', error);
+    }
+  };
+
+  const handleSaveProduct = async (productData: {
+    name: string;
+    category: string;
+    description: string;
+    default_price: number;
+    icon: string;
+    image_url: string;
+  }) => {
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, productData);
+      } else {
+        await createProduct(productData);
+      }
+      setProductModalOpen(false);
+      setEditingProduct(null);
+    } catch (error) {
+      console.error('Failed to save product:', error);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      await deleteProduct(productId);
+    } catch (error) {
+      console.error('Failed to delete product:', error);
     }
   };
 
@@ -695,8 +793,8 @@ export default function DropPage() {
       return;
     }
 
-    if (shoes.length === 0) {
-      alert('Please add at least one shoe');
+    if (shoes.length === 0 && retailItems.length === 0) {
+      alert('Please add at least one shoe or product');
       return;
     }
 
@@ -704,6 +802,7 @@ export default function DropPage() {
       const operationData = {
         customer: selectedCustomer,
         shoes: shoes,
+        retailItems: retailItems,
         status: 'pending' as const,
         totalAmount: calculateTotal(),
         discount: discountAmount,
@@ -712,13 +811,15 @@ export default function DropPage() {
         isDelivery: activeCartButtons.includes('delivery'),
         isPickup: activeCartButtons.includes('pickup'),
         notes: '',
-        promisedDate: promisedDate || null,
+        promisedDate: promisedDate ? `${promisedDate}T${promisedTime || '17:00'}` : null,
       };
 
-      await addOperation(operationData);
+      const result = await addOperation(operationData);
 
-      // Refresh operations to update other pages
-      await refreshOperations();
+      // Set success modal state - invoice is auto-generated
+      setCreatedInvoiceType('invoice');
+      setCreatedOperationId(result?.id || null);
+      setShowSuccessModal(true);
 
       // Clear form after successful submission
       setSelectedCategory(null);
@@ -726,6 +827,7 @@ export default function DropPage() {
       setSelectedColor(null);
       setSelectedServices([]);
       setShoes([]);
+      setRetailItems([]);
       setSelectedCustomer(null);
       setOperationStatus('none');
       setDiscountAmount(0);
@@ -733,8 +835,6 @@ export default function DropPage() {
       setOperationPayments([]);
       setHasPayments(false);
       setPromisedDate('');
-
-      alert('Drop-off recorded successfully');
     } catch (error) {
       console.error('Error submitting drop-off:', error);
       if (error instanceof Error) {
@@ -745,7 +845,7 @@ export default function DropPage() {
     }
   };
 
-  const handlePaymentCompletion = async (payments: Array<{method: string; amount: number}>) => {
+  const handlePaymentCompletion = async (payments: Array<{ method: string; amount: number }>) => {
     try {
       // First create the operation
       if (!selectedCustomer) {
@@ -753,14 +853,15 @@ export default function DropPage() {
         return;
       }
 
-      if (shoes.length === 0) {
-        alert('Please add at least one shoe');
+      if (shoes.length === 0 && retailItems.length === 0) {
+        alert('Please add at least one shoe or product');
         return;
       }
 
       const operationData = {
         customer: selectedCustomer,
         shoes: shoes,
+        retailItems: retailItems,
         status: 'pending' as const,
         totalAmount: calculateTotal(),
         discount: discountAmount,
@@ -812,20 +913,24 @@ export default function DropPage() {
       // Refresh operations
       await refreshOperations();
 
+      // Set success modal state - receipt is auto-generated on full payment
+      setCreatedInvoiceType('receipt');
+      setCreatedOperationId(updatedOperation?.id || operation.id);
+      setShowSuccessModal(true);
+
       // Clear form
       setSelectedCategory(null);
       setCustomCategoryName('');
       setSelectedColor(null);
       setSelectedServices([]);
       setShoes([]);
+      setRetailItems([]);
       setSelectedCustomer(null);
       setOperationStatus('none');
       setDiscountAmount(0);
       setActiveCartButtons([]);
       setOperationPayments([]);
       setHasPayments(false);
-
-      alert('Payment recorded successfully!');
     } catch (error) {
       console.error('Error processing payment:', error);
       if (error instanceof Error) {
@@ -853,7 +958,7 @@ export default function DropPage() {
 
       // Clear the form
       // handleCancel();
-      
+
       // Navigate to operations page
       // navigate('/operations');
     } catch (error) {
@@ -1027,12 +1132,15 @@ export default function DropPage() {
     setSelectedColor(null);
     setSelectedServices([]);
     setShoes([]);
+    setRetailItems([]);
     setOperationStatus('none');
   };
 
   const handleClearLastEntry = () => {
     if (shoes.length > 0) {
       setShoes(prev => prev.slice(0, -1));
+    } else if (retailItems.length > 0) {
+      setRetailItems(prev => prev.slice(0, -1));
     }
   };
 
@@ -1061,15 +1169,15 @@ export default function DropPage() {
   return (
     <div className="min-h-screen bg-gray-900 p-8">
       <div className="grid grid-cols-12 gap-6">
-        {/* Left Column - Categories and Colors */}
-        <div className="col-span-3 space-y-6">
+        {/* Left Column - Categories and Colors (Indigo Theme) */}
+        <div className="col-span-3 space-y-4">
           {/* Categories */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-            <h2 className="text-lg font-semibold mb-4 text-white flex items-center">
-              <Scissors className="text-indigo-400 mr-2" />
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 shadow-lg border-t-4 border-t-indigo-500">
+            <h2 className="text-sm font-semibold mb-3 text-white flex items-center">
+              <Scissors className="text-indigo-400 mr-2 w-4 h-4" />
               Category
             </h2>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {categories.map((category) => (
                 <button
                   key={category.id}
@@ -1085,8 +1193,8 @@ export default function DropPage() {
                     ${selectedCategory === category.id ? 'ring-2 ring-indigo-500 bg-gray-700' : 'border border-gray-700 hover:border-indigo-500'}
                   `}
                 >
-                  <div className="text-2xl mb-2 group-hover:scale-110 transition-transform">{category.icon}</div>
-                  <div className="text-xs text-gray-300 group-hover:text-white transition-colors truncate">{category.name}</div>
+                  <div className="text-2xl mb-1 group-hover:scale-110 transition-transform">{category.icon}</div>
+                  <div className="text-[10px] text-gray-300 group-hover:text-white transition-colors truncate">{category.name}</div>
                 </button>
               ))}
             </div>
@@ -1162,7 +1270,7 @@ export default function DropPage() {
                       <div className="mt-4">
                         <button
                           onClick={() => handleQuickAddToCart()}
-                          className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
+                          className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-200 flex items-center justify-center gap-2"
                         >
                           <Plus size={20} />
                           <span>Quick Add to Cart - {formatCurrency(parseInt(manualPrice) || 0)}</span>
@@ -1178,47 +1286,92 @@ export default function DropPage() {
             )}
           </div>
 
-          {/* Colors */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-            <h2 className="text-lg font-semibold mb-4 text-white flex items-center">
-              <Palette className="text-indigo-400 mr-2" />
-              Color (Optional)
-            </h2>
-            <div className="grid grid-cols-4 gap-3">
+          {/* Colors - Compact 2-line selector */}
+          <div className="bg-gray-800 rounded-xl p-3 border border-gray-700 shadow-lg border-t-4 border-t-indigo-400">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-xs font-semibold text-white flex items-center">
+                <Palette className="text-indigo-400 mr-2 w-3 h-3" />
+                Color
+              </h2>
+              <span className="text-[10px] text-gray-400">{selectedColor ? colors.find(c => c.id === selectedColor)?.name : 'None'}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {colors.map((color) => (
                 <button
                   key={color.id}
                   onClick={() => setSelectedColor(color.id)}
-                  className={`group relative p-2 rounded-lg transition-all duration-300
-                    ${selectedColor === color.id ? 'ring-2 ring-indigo-500 scale-110' : 'hover:scale-105'}
+                  className={`relative w-6 h-6 rounded-full transition-all duration-200 flex-shrink-0
+                    ${selectedColor === color.id ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-gray-800 scale-110' : 'hover:scale-105 hover:ring-1 hover:ring-gray-500'}
                   `}
                   title={color.name}
+                  style={color.isRainbow ? {
+                    background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff)',
+                  } : {
+                    backgroundColor: color.hexCode,
+                    border: color.hexCode === '#FFFFFF' || color.hexCode === '#F5F5DC' ? '1px solid #555' : 'none'
+                  }}
                 >
-                  <div 
-                    className={`w-8 h-8 rounded-lg ${color.bgClass} shadow-lg group-hover:shadow-xl transition-shadow`}
-                    style={{ 
-                      boxShadow: selectedColor === color.id ? '0 0 15px rgba(99, 102, 241, 0.5)' : undefined 
-                    }}
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center">
-                    {selectedColor === color.id && (
-                      <div className="w-2 h-2 bg-white rounded-full shadow-lg"></div>
-                    )}
-                  </span>
+                  {selectedColor === color.id && !color.isRainbow && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full shadow"></div>
+                    </div>
+                  )}
+                  {selectedColor === color.id && color.isRainbow && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full shadow"></div>
+                    </div>
+                  )}
                 </button>
-                ))}
+              ))}
+              <button
+                onClick={() => setSelectedColor(null)}
+                className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium transition-all duration-200 flex-shrink-0
+                  ${selectedColor === null ? 'ring-2 ring-gray-500 bg-gray-700 text-white' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600'}
+                `}
+                title="No Color"
+              >
+                ✕
+              </button>
             </div>
+            {/* Color Description Input */}
+            {selectedColor && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={colorDescription}
+                  onChange={(e) => setColorDescription(e.target.value)}
+                  placeholder="Color details..."
+                  maxLength={60}
+                  className="w-full bg-gray-700/50 rounded-lg px-2 py-1.5 text-[10px] text-white placeholder-gray-400 border border-gray-600 focus:ring-1 focus:ring-indigo-500 focus:border-transparent transition-all"
+                />
+              </div>
+            )}
           </div>
+
+          {/* Products Section */}
+          <ProductSalesSection
+            isAdmin={adminMode}
+            onProductSelect={handleAddRetailItemToCart}
+            onEditProduct={(product) => {
+              setEditingProduct(product);
+              setProductModalOpen(true);
+            }}
+            onDeleteProduct={handleDeleteProduct}
+            onAddProduct={() => {
+              setEditingProduct(null);
+              setProductModalOpen(true);
+            }}
+          />
         </div>
 
-        {/* Middle Column - Customer and Services */}
+        {/* Middle Column - Customer and Services (Violet Theme) */}
         <div className="col-span-6 space-y-6">
           {/* Customer Section */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg border-t-4 border-t-violet-500">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-indigo-500 bg-opacity-20 rounded-xl">
-                  <User className="text-2xl text-indigo-400" />
+                <div className="p-3 bg-violet-500 bg-opacity-20 rounded-xl">
+                  <User className="text-2xl text-violet-400" />
                 </div>
                 {selectedCustomer ? (
                   <div>
@@ -1254,7 +1407,7 @@ export default function DropPage() {
                 </button>
                 <button
                   onClick={handleOpenAddCustomer}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
+                  className="bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
                 >
                   <Plus size={18} className="mr-2" />
                   Add
@@ -1300,21 +1453,20 @@ export default function DropPage() {
           </div>
 
           {/* Service Selection */}
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg border-t-4 border-t-violet-400">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center space-x-4">
                 <h2 className="text-lg font-semibold text-white flex items-center">
-                  <Scissors className="text-indigo-400 mr-2" />
+                  <Scissors className="text-violet-400 mr-2" />
                   Select Services
                 </h2>
                 {isAdmin && (
                   <button
                     onClick={() => setAdminMode(!adminMode)}
-                    className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm transition-colors ${
-                      adminMode
+                    className={`flex items-center space-x-2 px-3 py-1 rounded-lg text-sm transition-colors ${adminMode
                         ? 'bg-red-600 text-white hover:bg-red-700'
                         : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                    }`}
+                      }`}
                   >
                     <Settings size={16} />
                     <span>{adminMode ? 'Exit Admin Mode' : 'Admin Mode'}</span>
@@ -1360,11 +1512,10 @@ export default function DropPage() {
                   setSelectedCategoryFilter('all');
                   setServiceSearchTerm('');
                 }}
-                className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                  selectedCategoryFilter === 'all'
+                className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-colors ${selectedCategoryFilter === 'all'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 All ({services?.length || 0})
               </button>
@@ -1375,11 +1526,10 @@ export default function DropPage() {
                     setSelectedCategoryFilter(category);
                     setServiceSearchTerm('');
                   }}
-                  className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-colors capitalize ${
-                    selectedCategoryFilter === category
+                  className={`px-3 py-1 rounded-lg text-sm whitespace-nowrap transition-colors capitalize ${selectedCategoryFilter === category
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
+                    }`}
                 >
                   {category} ({services.filter(s => (s.category || 'other') === category).length})
                 </button>
@@ -1417,7 +1567,7 @@ export default function DropPage() {
 
                 // When not searching, apply category filter
                 return selectedCategoryFilter === 'all' ||
-                       (service.category || 'other') === selectedCategoryFilter;
+                  (service.category || 'other') === selectedCategoryFilter;
               }) : [];
 
               return (
@@ -1447,72 +1597,70 @@ export default function DropPage() {
                       </div>
                     ) : (
                       filteredServices.map((service) => (
-                  <button
-                    key={service.id}
-                    onClick={() => {
-                      if (!adminMode) {
-                        if (selectedServices.includes(service.id)) {
-                          setSelectedServices(prev => prev.filter(id => id !== service.id));
-                        } else {
-                          setSelectedServices(prev => [...prev, service.id]);
-                        }
-                      }
-                    }}
-                    className={`p-4 rounded-xl transition-all duration-300 relative ${
-                      selectedServices.includes(service.id)
-                        ? 'bg-indigo-600 hover:bg-indigo-700'
-                        : 'bg-gray-700 hover:bg-gray-600 border border-gray-600 hover:border-indigo-500'
-                    } ${adminMode ? 'cursor-default' : ''}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-white">{service.name}</span>
-                          {service.category && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-gray-600 text-gray-300 capitalize">
-                              {service.category}
-                            </span>
-                          )}
-                        </div>
-                        <span className={`font-semibold ${
-                          selectedServices.includes(service.id) ? 'text-white' : 'text-indigo-400'
-                        }`}>
-                          {formatCurrency(service.price)}
-                        </span>
-                      </div>
+                        <button
+                          key={service.id}
+                          onClick={() => {
+                            if (!adminMode) {
+                              if (selectedServices.includes(service.id)) {
+                                setSelectedServices(prev => prev.filter(id => id !== service.id));
+                              } else {
+                                setSelectedServices(prev => [...prev, service.id]);
+                              }
+                            }
+                          }}
+                          className={`p-4 rounded-xl transition-all duration-300 relative ${selectedServices.includes(service.id)
+                              ? 'bg-indigo-600 hover:bg-indigo-700'
+                              : 'bg-gray-700 hover:bg-gray-600 border border-gray-600 hover:border-indigo-500'
+                            } ${adminMode ? 'cursor-default' : ''}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-white">{service.name}</span>
+                                {service.category && (
+                                  <span className="px-2 py-0.5 text-xs rounded-full bg-gray-600 text-gray-300 capitalize">
+                                    {service.category}
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`font-semibold ${selectedServices.includes(service.id) ? 'text-white' : 'text-indigo-400'
+                                }`}>
+                                {formatCurrency(service.price)}
+                              </span>
+                            </div>
 
-                      {adminMode && (
-                        <div className="flex items-center space-x-1 ml-2">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditService(service);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
-                            title="Edit service"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteService(service.id);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-                            title="Delete service"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                  ))
-                )}
-              </div>
-            </>
-          );
-        })()}
+                            {adminMode && (
+                              <div className="flex items-center space-x-1 ml-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditService(service);
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  title="Edit service"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteService(service.id);
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="Delete service"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              );
+            })()}
 
             {/* Color Selection and Size Selection */}
             {selectedServices.length > 0 && (
@@ -1524,11 +1672,10 @@ export default function DropPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => setSelectedColor(null)}
-                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                          selectedColor === null
+                        className={`px-3 py-1 rounded-lg text-sm transition-colors ${selectedColor === null
                             ? 'bg-indigo-600 text-white'
                             : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
+                          }`}
                       >
                         None
                       </button>
@@ -1536,11 +1683,10 @@ export default function DropPage() {
                         <button
                           key={color.id}
                           onClick={() => setSelectedColor(color.id)}
-                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                            selectedColor === color.id
+                          className={`px-3 py-1 rounded-lg text-sm transition-colors ${selectedColor === color.id
                               ? 'bg-indigo-600 text-white'
                               : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                          }`}
+                            }`}
                           title={color.name}
                         >
                           {color.name}
@@ -1564,7 +1710,7 @@ export default function DropPage() {
                     </div>
                     <button
                       onClick={handleAddShoe}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
                     >
                       <Plus size={18} className="mr-2" />
                       Add to Cart
@@ -1576,7 +1722,7 @@ export default function DropPage() {
                   <div className="flex justify-end">
                     <button
                       onClick={handleAddShoe}
-                      className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center"
                     >
                       <Plus size={18} className="mr-2" />
                       Add to Cart
@@ -1589,170 +1735,259 @@ export default function DropPage() {
 
         </div>
 
-        {/* Right Column - Cart */}
+        {/* Right Column - Cart (Emerald Theme) */}
         <div className="col-span-3">
-          <div id="cart-summary" className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-            <h2 className="text-xl font-semibold text-white mb-6 flex items-center justify-between">
-              <span>Cart Summary</span>
-              <span className="text-green-400">{formatCurrency(calculateTotal())}</span>
-            </h2>
-            <div className="space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto custom-scrollbar">
+          <div id="cart-summary" className="card-bevel p-6 bg-gradient-to-br from-emerald-950/50 via-gray-900 to-gray-900 border-t-4 border-t-emerald-500 backdrop-blur-sm">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-900/50 border border-emerald-700/50">
+                  <Package size={20} className="text-emerald-400" />
+                </div>
+                <h2 className="text-lg font-semibold text-gray-200">Cart Summary</h2>
+              </div>
+              <div className="flex items-center space-x-3 bg-emerald-900/30 rounded-lg px-4 py-2 border border-emerald-800/50">
+                <span className="text-gray-400 text-sm">Total:</span>
+                <span className="text-emerald-400 font-semibold">{formatCurrency(calculateTotal())}</span>
+              </div>
+            </div>
+
+            {/* Items List */}
+            <div className="space-y-3 max-h-[calc(100vh-320px)] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
               {shoes.map((shoe, index) => (
-                <div key={shoe.id} className="bg-gray-900 rounded-xl p-4 border border-gray-700">
+                <div key={shoe.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 hover:border-emerald-600 transition-colors group">
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center mb-2">
-                        {shoe.category && (
-                          <span className="text-2xl mr-2">
-                            {shoe.category.startsWith('other-')
-                              ? '🔧'
-                              : categories.find(c => c.id === shoe.category)?.icon
-                            }
-                          </span>
-                        )}
-                        <h3 className="font-medium text-white">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-900/30 border border-emerald-700/50">
+                        <span className="text-lg">
+                          {shoe.category.startsWith('other-')
+                            ? '🔧'
+                            : categories.find(c => c.id === shoe.category)?.icon
+                          }
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-200">
                           {shoe.description}
                           {shoe.manualPrice && (
-                            <span className="ml-2 text-xs text-indigo-400 bg-indigo-900/50 px-2 py-1 rounded-full">
-                              Custom Price
+                            <span className="ml-2 text-xs text-orange-400 bg-orange-900/40 px-2 py-0.5 rounded-full">
+                              Custom
                             </span>
                           )}
                         </h3>
+                        <div className="flex items-center space-x-3 mt-1">
+                          {shoe.color && shoe.color !== 'none' && (() => {
+                            const shoeColor = colors.find(c => c.id === shoe.color);
+                            if (!shoeColor) return null;
+                            return (
+                              <div className="flex items-center space-x-1">
+                                <div
+                                  className="w-2 h-2 rounded-full"
+                                  style={shoeColor.isRainbow ? {
+                                    background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff)'
+                                  } : {
+                                    backgroundColor: shoeColor.hexCode,
+                                    border: shoeColor.hexCode === '#FFFFFF' || shoeColor.hexCode === '#F5F5DC' ? '1px solid #555' : 'none'
+                                  }}
+                                />
+                                <span className="text-xs text-gray-400">{shoeColor.name}</span>
+                                {shoe.colorDescription && (
+                                  <span className="text-xs text-indigo-400 italic ml-1">"{shoe.colorDescription}"</span>
+                                )}
+                              </div>
+                            );
+                          })()}
+                          {shoe.size && (
+                            <span className="text-xs text-emerald-400">Size {shoe.size}</span>
+                          )}
+                        </div>
                       </div>
-                      {shoe.color && shoe.color !== 'none' && (
-                        <div className="flex items-center">
-                          <div
-                            className={`w-3 h-3 rounded-lg ${colors.find(c => c.id === shoe.color)?.bgClass} mr-2`}
-                          />
-                          <span className="text-sm text-gray-400">
-                            {colors.find(c => c.id === shoe.color)?.name}
-                          </span>
-                        </div>
-                      )}
-                      {shoe.size && (
-                        <div className="flex items-center mt-1">
-                          <span className="text-sm text-indigo-400">
-                            Size: {shoe.size}
-                          </span>
-                        </div>
-                      )}
-                      <div className="mt-2 text-sm text-green-400 font-semibold">
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm font-medium text-green-400">
                         {shoe.manualPrice
                           ? formatCurrency(shoe.manualPrice)
                           : formatCurrency(shoe.services.reduce((sum, s) => sum + s.price, 0))
                         }
-                      </div>
+                      </span>
+                      <button
+                        onClick={() => handleRemoveShoe(shoe.id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-700/50 text-gray-400 hover:text-red-400 hover:bg-red-900/40 transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <X size={16} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleRemoveShoe(shoe.id)}
-                      className="text-gray-400 hover:text-red-400 transition-colors duration-200 ml-2"
-                    >
-                      <X size={20} />
-                    </button>
                   </div>
                 </div>
               ))}
+
+              {/* Retail Items */}
+              {retailItems.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-700">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-amber-400 flex items-center">
+                      <ShoppingBag size={14} className="mr-2" />
+                      Retail Items
+                    </h3>
+                    <span className="text-xs text-gray-400">{retailItems.length} item(s)</span>
+                  </div>
+                  {retailItems.map((item) => (
+                    <div key={item.id} className="bg-gray-800/50 rounded-lg p-3 border border-gray-700 hover:border-amber-600 transition-colors group mb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.productName} className="w-10 h-10 rounded-lg object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-amber-900/30 border border-amber-700/50 flex items-center justify-center">
+                              <span className="text-lg">{item.icon || '🛍️'}</span>
+                            </div>
+                          )}
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-200">{item.productName}</h4>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs text-gray-400">{formatCurrency(item.unitPrice)} x {item.quantity}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-sm font-medium text-green-400">
+                            {formatCurrency(item.totalPrice)}
+                          </span>
+                          <button
+                            onClick={() => handleRemoveRetailItem(item.id)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-700/50 text-gray-400 hover:text-red-400 hover:bg-red-900/40 transition-all opacity-0 group-hover:opacity-100"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {shoes.length > 0 && (
+            {(shoes.length > 0 || retailItems.length > 0) && (
               <div className="mt-6 space-y-4">
-                {/* Promise Date - User Selectable */}
-                <div className="bg-indigo-900/30 border border-indigo-700 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Calendar size={18} className="text-indigo-400" />
-                      <span className="text-indigo-300 text-sm font-medium">Promise Date:</span>
+                {/* Pickup Date & Time */}
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 border-l-4 border-l-emerald-500">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-2">
+                      <Calendar size={16} className="text-emerald-400" />
+                      <span className="text-sm font-medium text-gray-300">Pickup Date & Time</span>
                     </div>
                     {getTentativeReadyDate() && (
-                      <span className="text-indigo-400 text-xs">
-                        Suggested: {getTentativeReadyDate()}
-                      </span>
+                      <span className="text-xs text-emerald-400/70">Suggested: {getTentativeReadyDate()} by 5pm</span>
                     )}
                   </div>
-                  <input
-                    type="date"
-                    value={promisedDate}
-                    onChange={(e) => setPromisedDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full bg-indigo-950/50 border border-indigo-700 rounded-lg px-4 py-2 text-indigo-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="date"
+                      value={promisedDate}
+                      onChange={(e) => setPromisedDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="flex-1 bg-gray-700/50 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                    />
+                    <input
+                      type="time"
+                      value={promisedTime}
+                      onChange={(e) => setPromisedTime(e.target.value)}
+                      className="w-28 bg-gray-700/50 rounded-lg border border-gray-600 px-3 py-2 text-sm text-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                    />
+                    {promisedDate && promisedTime && (
+                      <div className="flex items-center px-3 py-2 bg-indigo-900/30 rounded-lg text-xs text-indigo-300 space-x-1">
+                        <Clock size={12} />
+                        <span>{new Date(`${promisedDate}T${promisedTime}`).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Quick Actions Row - Delivery, Pickup, Discount */}
-                <div className="grid grid-cols-3 gap-3">
+                {/* Quick Actions */}
+                <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => toggleCartButton('delivery')}
-                    className={`p-3 rounded-lg ${activeCartButtons.includes('delivery') ? 'bg-orange-700 text-white' : 'bg-orange-500 text-gray-200'} hover:bg-orange-600 transition-colors font-medium`}
+                    onClick={() => {
+                      setPriceOverrideInput(cartPriceOverride !== null ? cartPriceOverride.toString() : calculateTotal().toString());
+                      setShowPriceOverrideModal(true);
+                    }}
+                    className={`p-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${cartPriceOverride !== null
+                        ? 'bg-orange-900/40 text-orange-400 border border-orange-500/50'
+                        : 'bg-gray-800/50 text-gray-300 border border-gray-600 hover:bg-gray-700/50'
+                      }`}
                   >
-                    Delivery
-                  </button>
-                  <button
-                    onClick={() => toggleCartButton('pickup')}
-                    className={`p-3 rounded-lg ${activeCartButtons.includes('pickup') ? 'bg-teal-700 text-white' : 'bg-teal-500 text-gray-200'} hover:bg-teal-600 transition-colors font-medium`}
-                  >
-                    Pickup
+                    <DollarSign size={16} />
+                    <span className="text-sm font-medium">
+                      {cartPriceOverride !== null ? 'Price Set' : 'Change Price'}
+                    </span>
                   </button>
                   <button
                     onClick={() => setShowDiscountModal(true)}
-                    className="p-3 rounded-lg bg-pink-500 text-gray-200 hover:bg-pink-600 transition-colors font-medium relative"
+                    className="p-3 rounded-lg flex items-center justify-center space-x-2 bg-gray-800/50 text-gray-300 border border-gray-600 hover:bg-gray-700/50 transition-all relative"
                   >
-                    % Discount
+                    <Percent size={16} />
+                    <span className="text-sm font-medium">Discount</span>
                     {discountAmount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
                         ✓
                       </span>
                     )}
                   </button>
                 </div>
 
-                {/* Discount Applied Display */}
-                {discountAmount > 0 && (
-                  <div className="bg-pink-900/30 rounded-lg p-3 flex justify-between items-center">
-                    <span className="text-pink-300 text-sm">Discount Applied:</span>
-                    <span className="text-pink-400 font-semibold">-{formatCurrency(discountAmount)}</span>
+                {/* Applied Adjustments */}
+                {cartPriceOverride !== null && (
+                  <div className="flex justify-between items-center bg-orange-900/20 rounded-lg px-4 py-3 border border-orange-500/30">
+                    <span className="text-sm text-orange-300">Price Override</span>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-sm font-semibold text-orange-400">{formatCurrency(cartPriceOverride)}</span>
+                      <button
+                        onClick={() => setCartPriceOverride(null)}
+                        className="text-xs text-orange-500 hover:text-orange-300"
+                      >
+                        Clear
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {/* Payment Section - Prominent, Full Width */}
-                <div className="bg-gradient-to-r from-purple-900/40 to-purple-800/40 border border-purple-700 rounded-lg p-4 space-y-3">
+                {discountAmount > 0 && (
+                  <div className="flex justify-between items-center bg-pink-900/20 rounded-lg px-4 py-3 border border-pink-500/30">
+                    <span className="text-sm text-pink-300">Discount</span>
+                    <span className="text-sm font-semibold text-pink-400">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
+
+                {/* Payment Section */}
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 border-l-4 border-l-cyan-500 space-y-3">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h3 className="text-white font-semibold flex items-center gap-2">
-                        <DollarSign size={18} className="text-purple-400" />
-                        Payment Options
+                      <h3 className="text-sm font-medium text-gray-200 flex items-center space-x-2">
+                        <CreditCard size={16} className="text-cyan-400" />
+                        <span>Payment</span>
                       </h3>
                       <p className="text-xs text-gray-400 mt-1">
-                        {selectedCustomer ? `Customer: ${selectedCustomer.name}` : 'Select a customer first'}
+                        {selectedCustomer ? selectedCustomer.name : 'Select a customer'}
                       </p>
-                      {selectedCustomer && selectedCustomer.accountBalance && selectedCustomer.accountBalance > 0 && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <DollarSign size={14} className="text-green-400" />
-                          <span className="text-xs text-green-400">
-                            Available Credit: {formatCurrency(selectedCustomer.accountBalance)}
-                          </span>
-                        </div>
+                      {selectedCustomer?.accountBalance && selectedCustomer.accountBalance > 0 && (
+                        <p className="text-xs text-emerald-400 mt-0.5">Credit: {formatCurrency(selectedCustomer.accountBalance)}</p>
                       )}
                     </div>
                     <button
                       onClick={() => setIsPaymentModalOpen(true)}
-                      className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-lg"
+                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg font-medium transition-colors flex items-center space-x-2"
                     >
-                      <CreditCard size={18} />
-                      Record Payment
+                      <CreditCard size={16} />
+                      <span>Record Payment</span>
                     </button>
                   </div>
 
-                  {/* Payment Summary - Shows after payments are recorded */}
                   {operationPayments && operationPayments.length > 0 && (
-                    <div className="bg-purple-900/30 rounded-lg p-3">
-                      <p className="text-xs text-purple-300 mb-2">Payments Recorded:</p>
-                      <div className="space-y-1">
+                    <div className="pt-3 border-t border-gray-700">
+                      <div className="flex items-center space-x-2">
                         {operationPayments.map((payment: any, index: number) => (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span className="text-gray-300">{payment.payment_method.replace('_', ' ')}</span>
-                            <span className="text-green-400 font-medium">
-                              {formatCurrency(payment.amount)}
-                            </span>
+                          <div key={index} className="flex items-center space-x-2 px-3 py-1.5 bg-green-900/30 rounded-lg border border-green-500/30">
+                            <span className="text-xs text-green-400 capitalize">{payment.payment_method.replace('_', ' ')}</span>
+                            <span className="text-xs font-semibold text-green-300">{formatCurrency(payment.amount)}</span>
                           </div>
                         ))}
                       </div>
@@ -1760,14 +1995,14 @@ export default function DropPage() {
                   )}
                 </div>
 
-                {/* I Finished Button */}
+                {/* Finish Button */}
                 {!hasPayments && (
                   <button
                     onClick={handleSubmit}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-4 rounded-xl transition-colors duration-200 flex items-center justify-center font-semibold text-lg shadow-lg hover:shadow-xl"
+                    className="w-full p-4 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white font-semibold transition-all flex items-center justify-center space-x-2 shadow-lg shadow-emerald-900/30"
                   >
-                    <CheckCircle size={24} className="mr-2" />
-                    I Finished
+                    <CheckCircle size={20} />
+                    <span>Finish</span>
                   </button>
                 )}
 
@@ -1845,6 +2080,80 @@ export default function DropPage() {
         </div>
       )}
 
+      {/* Price Override Modal */}
+      {showPriceOverrideModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-xl p-6 w-full max-w-md border border-gray-700">
+            <h2 className="text-xl font-semibold mb-4 text-white">Change Total Price</h2>
+
+            {/* Calculated Total */}
+            <div className="bg-gray-700 rounded-lg p-3 mb-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300">Calculated Total:</span>
+                <span className="text-white font-semibold">
+                  {formatCurrency(shoes.reduce((total, shoe) => {
+                    if (shoe.manualPrice) {
+                      return total + shoe.manualPrice;
+                    }
+                    return total + shoe.services.reduce((sum, service) => sum + (service.price || 0) * (service.quantity || 1), 0);
+                  }, 0))}
+                </span>
+              </div>
+            </div>
+
+            {/* Price Override Input */}
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              New Total Price (UGX)
+            </label>
+            <input
+              type="number"
+              value={priceOverrideInput}
+              onChange={(e) => setPriceOverrideInput(e.target.value)}
+              className="w-full bg-gray-700 rounded-lg p-3 mb-4 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-white"
+              placeholder="Enter new total price"
+              min="0"
+            />
+
+            {/* New Total After Discount */}
+            {discountAmount > 0 && (
+              <div className="bg-indigo-900/30 rounded-lg p-3 mb-4 border border-indigo-700">
+                <div className="flex justify-between items-center">
+                  <span className="text-indigo-300 font-medium">After Discount:</span>
+                  <span className="text-indigo-400 font-bold text-lg">
+                    {formatCurrency(Math.max(0, (parseInt(priceOverrideInput) || 0) - discountAmount))}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowPriceOverrideModal(false);
+                  setPriceOverrideInput('');
+                }}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const newPrice = parseInt(priceOverrideInput);
+                  if (!isNaN(newPrice) && newPrice >= 0) {
+                    setCartPriceOverride(newPrice);
+                  }
+                  setShowPriceOverrideModal(false);
+                  setPriceOverrideInput('');
+                }}
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors duration-200"
+              >
+                Apply Price
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Service CRUD Modal */}
       {serviceModalOpen && (
         <ServiceCRUDModal
@@ -1870,6 +2179,18 @@ export default function DropPage() {
         />
       )}
 
+      {/* Product CRUD Modal */}
+      <ProductCRUDModal
+        isOpen={productModalOpen}
+        onClose={() => {
+          setProductModalOpen(false);
+          setEditingProduct(null);
+        }}
+        product={editingProduct}
+        onSave={handleSaveProduct}
+        onDelete={editingProduct ? () => handleDeleteProduct(editingProduct.id) : undefined}
+      />
+
       {/* Payment Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
@@ -1880,6 +2201,108 @@ export default function DropPage() {
           await handlePaymentCompletion(payments);
         }}
       />
+
+      {/* Success Modal - Show after operation creation with invoice/receipt */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl w-full max-w-md border border-gray-700 shadow-2xl overflow-hidden">
+            <div className={`p-6 text-center ${createdInvoiceType === 'receipt'
+                ? 'bg-gradient-to-r from-emerald-900/50 to-green-900/50'
+                : 'bg-gradient-to-r from-orange-900/50 to-amber-900/50'
+              }`}>
+              <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4 ${createdInvoiceType === 'receipt'
+                  ? 'bg-emerald-500/20'
+                  : 'bg-orange-500/20'
+                }`}>
+                {createdInvoiceType === 'receipt' ? (
+                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                )}
+              </div>
+              <h3 className="text-xl font-bold text-white mb-1">
+                {createdInvoiceType === 'receipt' ? 'Payment Complete!' : 'Drop-off Recorded!'}
+              </h3>
+              <p className="text-sm text-gray-300">
+                {createdInvoiceType === 'receipt'
+                  ? 'Receipt has been generated automatically'
+                  : 'Invoice has been generated automatically'}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-center text-gray-400 text-sm">
+                Would you like to print the {createdInvoiceType}?
+              </p>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={async () => {
+                    if (createdOperationId) {
+                      try {
+                        // First create the invoice/receipt
+                        const invoiceRes = await fetch('http://localhost:3000/api/invoices', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            operationId: createdOperationId,
+                            type: createdInvoiceType
+                          })
+                        });
+
+                        if (!invoiceRes.ok) {
+                          const err = await invoiceRes.json();
+                          // If invoice already exists, use that ID
+                          if (err.invoiceId) {
+                            await fetch(`http://localhost:3000/api/invoices/${err.invoiceId}/print`, {
+                              method: 'POST'
+                            });
+                            toast.success(`${createdInvoiceType === 'receipt' ? 'Receipt' : 'Invoice'} printed`);
+                          } else {
+                            toast.error(err.error || 'Failed to create invoice');
+                          }
+                        } else {
+                          const invoice = await invoiceRes.json();
+                          // Now print with the invoice ID
+                          await fetch(`http://localhost:3000/api/invoices/${invoice.id}/print`, {
+                            method: 'POST'
+                          });
+                          toast.success(`${createdInvoiceType === 'receipt' ? 'Receipt' : 'Invoice'} printed`);
+                        }
+                      } catch (error) {
+                        console.error('Print error:', error);
+                        toast.error('Failed to print');
+                      }
+                    }
+                    setShowSuccessModal(false);
+                    setCreatedOperationId(null);
+                  }}
+                  className={`flex-1 py-3 rounded-xl font-medium transition-all flex items-center justify-center space-x-2 ${createdInvoiceType === 'receipt'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-orange-600 hover:bg-orange-700 text-white'
+                    }`}
+                >
+                  <Printer size={18} />
+                  <span>Print {createdInvoiceType === 'receipt' ? 'Receipt' : 'Invoice'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setCreatedOperationId(null);
+                  }}
+                  className="flex-1 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-medium transition-all"
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
