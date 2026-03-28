@@ -1306,9 +1306,10 @@ export default function DropPage() {
                   title={color.name}
                   style={color.isRainbow ? {
                     background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff)',
+                    border: '1px solid #444',
                   } : {
                     backgroundColor: color.hexCode,
-                    border: color.hexCode === '#FFFFFF' || color.hexCode === '#F5F5DC' ? '1px solid #555' : 'none'
+                    border: '1px solid #444',
                   }}
                 >
                   {selectedColor === color.id && !color.isRainbow && (
@@ -1679,7 +1680,7 @@ export default function DropPage() {
                       >
                         None
                       </button>
-                      {colors.slice(0, 8).map((color) => (
+                      {colors.map((color) => (
                         <button
                           key={color.id}
                           onClick={() => setSelectedColor(color.id)}
@@ -1784,10 +1785,11 @@ export default function DropPage() {
                                 <div
                                   className="w-2 h-2 rounded-full"
                                   style={shoeColor.isRainbow ? {
-                                    background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff)'
+                                    background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff)',
+                                    border: '1px solid #444',
                                   } : {
                                     backgroundColor: shoeColor.hexCode,
-                                    border: shoeColor.hexCode === '#FFFFFF' || shoeColor.hexCode === '#F5F5DC' ? '1px solid #555' : 'none'
+                                    border: '1px solid #444',
                                   }}
                                 />
                                 <span className="text-xs text-gray-400">{shoeColor.name}</span>
