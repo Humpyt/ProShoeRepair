@@ -282,7 +282,7 @@ router.post('/:id/print', async (req, res) => {
 
     // Get operation details
     const operation = await db.prepare(`
-      SELECT o.*, c.name as customer_name, c.phone as customer_phone
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.account_balance as customer_credit
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.id = ?
@@ -412,6 +412,13 @@ router.post('/:id/print', async (req, res) => {
         const balance = invoice.total - invoice.amount_paid;
         if (balance > 0) {
           chunks.push(text(`${padRight('Balance Due:', 30)}${padLeft(formatCurrency(balance), 18)}`));
+        }
+        // Show credit balance if available
+        if (operation.customer_credit && operation.customer_credit > 0) {
+          chunks.push(text(''));
+          chunks.push(cmd.boldOn);
+          chunks.push(text(`${padRight('Your Credit Balance:', 30)}${padLeft(formatCurrency(operation.customer_credit), 18)}`));
+          chunks.push(cmd.boldOff);
         }
       }
 

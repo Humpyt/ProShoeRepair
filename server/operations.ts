@@ -505,6 +505,20 @@ router.post('/:id/payments', async (req, res) => {
       WHERE id = ?
     `).run(totalPaid, now, (operation as any).customer_id);
 
+    // Auto-capture 2% credit on transaction
+    const creditAmount = Math.round(totalPaid * 0.02);
+    if (creditAmount > 0) {
+      const customerId = (operation as any).customer_id;
+      const creditTransactionId = `credit_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const currentCustomer = await db.get('SELECT account_balance FROM customers WHERE id = ?', [customerId]);
+      const newCreditBalance = (currentCustomer?.account_balance || 0) + creditAmount;
+      await db.run(`
+        INSERT INTO customer_credits (id, customer_id, amount, balance_after, type, description, created_by, created_at)
+        VALUES (?, ?, ?, ?, 'credit', ?, ?, ?)
+      `, [creditTransactionId, customerId, creditAmount, newCreditBalance, '2% transaction credit', null, now]);
+      await db.run('UPDATE customers SET account_balance = ? WHERE id = ?', [newCreditBalance, customerId]);
+    }
+
     await db.run('COMMIT');
 
     let generatedDocumentId: string | null = null;

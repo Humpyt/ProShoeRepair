@@ -89,8 +89,16 @@ const CustomerListRow: React.FC<CustomerListRowProps> = ({
         </div>
 
         {/* Spent */}
-        <div className="w-24 flex-shrink-0 text-right">
+        <div className="hidden lg:block w-24 flex-shrink-0 text-right">
           <p className="text-sm font-semibold text-indigo-400">{formatCurrency(customer.totalSpent)}</p>
+        </div>
+
+        {/* Credit */}
+        <div className="w-24 flex-shrink-0 text-right">
+          <p className={`text-sm font-semibold ${(customer.accountBalance || 0) > 0 ? 'text-emerald-400' : 'text-gray-500'}`}>
+            {(customer.accountBalance || 0) > 0 ? formatCurrency(customer.accountBalance!) : '-'}
+          </p>
+          <p className="text-[10px] text-gray-500">credit</p>
         </div>
       </div>
 
