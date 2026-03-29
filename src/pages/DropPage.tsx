@@ -798,6 +798,12 @@ export default function DropPage() {
       return;
     }
 
+    // Require pickup date for service transactions (shoes), but not for product-only purchases
+    if (shoes.length > 0 && !promisedDate) {
+      alert('Please select a pickup date for repair services');
+      return;
+    }
+
     try {
       const operationData = {
         customer: selectedCustomer,

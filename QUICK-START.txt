@@ -1,0 +1,113 @@
+╔══════════════════════════════════════════════════════════════╗
+║     Shoe Repair POS - Deploy Backend to VPS                  ║
+╚══════════════════════════════════════════════════════════════╝
+
+🚀 FASTEST METHOD - Double-click: START-DEPLOY.bat
+
+This will:
+  1. Connect to your VPS
+  2. Set up Node.js and PM2
+  3. Upload all server files
+  4. Start your application
+
+Password required (3+ times): HaaH+&FXzoi-0nBO7gK(
+
+┌─────────────────────────────────────────────────────────────┐
+│  MANUAL METHOD (if batch file fails)                        │
+└─────────────────────────────────────────────────────────────┘
+
+STEP 1 - Connect to VPS:
+  ssh root@69.62.125.228
+  Password: HaaH+&FXzoi-0nBO7gK(
+
+STEP 2 - Run this command (copy & paste entire block):
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+  apt-get install -y nodejs && \
+  npm install -g pm2 && \
+  mkdir -p /var/www/shoe-repair-pos && \
+  cd /var/www/shoe-repair-pos
+
+STEP 3 - In a NEW terminal on your PC, upload files:
+  cd "F:\Shoe Repair POS - Copy"
+  scp -r server root@69.62.125.228:/var/www/shoe-repair-pos/
+
+STEP 4 - Back in VPS terminal, create package.json:
+  cd /var/www/shoe-repair-pos
+  cat > package.json << 'EOF'
+  {
+    "name": "shoe-repair-pos-backend",
+    "version": "1.0.0",
+    "main": "server/index.js",
+    "scripts": { "start": "node server/index.js" },
+    "dependencies": {
+      "express": "^4.18.2",
+      "cors": "^2.8.5",
+      "sqlite3": "^5.1.7",
+      "bcrypt": "^5.1.1",
+      "jsonwebtoken": "^9.0.2",
+      "date-fns": "^3.0.0",
+      "qrcode": "^1.5.3"
+    }
+  }
+  EOF
+
+STEP 5 - Install dependencies and start:
+  npm install --production
+  pm2 start server/index.js --name shoe-repair-pos
+  pm2 save
+  pm2 status
+
+┌─────────────────────────────────────────────────────────────┐
+│  AFTER DEPLOYMENT                                           │
+└─────────────────────────────────────────────────────────────┘
+
+✅ Your API: http://69.62.125.228:3000/api
+
+Test it:
+  curl http://69.62.125.228:3000/api/operations
+  or open in browser
+
+Update Netlify:
+  1. Go to app.netlify.com
+  2. Select your site
+  3. Site Settings → Environment variables
+  4. Add: VITE_API_URL = http://69.62.125.228:3000/api
+  5. Trigger new deploy
+
+┌─────────────────────────────────────────────────────────────┐
+│  USEFUL COMMANDS                                            │
+└─────────────────────────────────────────────────────────────┐
+
+  ssh root@69.62.125.228              ← Connect to VPS
+  pm2 status                          ← Check if running
+  pm2 logs shoe-repair-pos            ← View logs
+  pm2 restart shoe-repair-pos         ← Restart server
+  pm2 stop shoe-repair-pos            ← Stop server
+
+┌─────────────────────────────────────────────────────────────┐
+│  TROUBLESHOOTING                                            │
+└─────────────────────────────────────────────────────────────┘
+
+Can't connect?
+  → Check VPS is reachable: ping 69.62.125.228
+  → Check PM2 status: pm2 status
+  → Check logs: pm2 logs shoe-repair-pos
+
+Server not starting?
+  → Check error logs: pm2 logs shoe-repair-pos --err
+  → Try manual start: cd /var/www/shoe-repair-pos && node server/index.js
+
+Connection refused?
+  → Open firewall: ufw allow 3000
+  → Check Hostinger firewall settings
+
+╔══════════════════════════════════════════════════════════════╗
+║  Files Available:                                           ║
+║  ├─ START-DEPLOY.bat        (Automated deployment)         ║
+║  ├─ DEPLOY-AUTOMATED.ps1    (PowerShell script)            ║
+║  ├─ vps-setup-complete.sh   (VPS setup script)             ║
+║  ├─ DEPLOY_README.md        (Detailed guide)               ║
+║  └─ MANUAL_DEPLOY_STEPS.md  (Step-by-step instructions)    ║
+╚══════════════════════════════════════════════════════════════╝
+
+Need help? See DEPLOY_README.md for detailed documentation.

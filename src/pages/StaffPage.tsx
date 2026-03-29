@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Grid, List, Plus, Receipt, Package, Calendar, TrendingUp, Wallet } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Grid, List, Plus, Receipt, Package, Calendar, TrendingUp, Wallet, ArrowRightLeft } from 'lucide-react';
 import Staff from '../components/Staff';
 import { useExpenses } from '../contexts/ExpenseContext';
 import { useAuthStore } from '../store/authStore';
@@ -10,7 +10,7 @@ import { CreateExpenseInput, UpdateExpenseInput } from '../types/expense';
 
 const StaffPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'staff' | 'expenses'>('staff');
-  const { expenses, addExpense, fetchExpenses, fetchAnalytics, pagination, loadMoreExpenses, loading } = useExpenses();
+  const { expenses, addExpense, fetchExpenses, fetchAnalytics, pagination, loadMoreExpenses, loading, analytics } = useExpenses();
   const { user } = useAuthStore();
   const [expenseModalOpen, setExpenseModalOpen] = useState(false);
 
@@ -20,6 +20,15 @@ const StaffPage: React.FC = () => {
       fetchAnalytics();
     }
   }, [activeTab, fetchExpenses, fetchAnalytics]);
+
+  // Compute analytics for staff expenses
+  const staffAnalytics = useMemo(() => {
+    const topCategory = analytics?.categoryBreakdown?.[0] || null;
+    const daysInMonth = new Date().getDate();
+    const dailyAverage = (analytics?.totalThisMonth || 0) / daysInMonth;
+    const pendingAmount = analytics?.statusBreakdown?.find(s => s.status === 'pending')?.amount || 0;
+    return { topCategory, dailyAverage, pendingAmount };
+  }, [analytics]);
 
   const getCategoryIcon = (category: string) => {
     if (category.includes('Supplies') || category.includes('Materials')) return <Package size={14} />;
@@ -103,41 +112,85 @@ const StaffPage: React.FC = () => {
       )}
 
       {activeTab === 'expenses' && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
-          <div className="p-4 border-b border-gray-700 flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-gray-200">My Expenses</h3>
-            <button
-              onClick={() => setExpenseModalOpen(true)}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
-            >
-              <Plus size={16} />
-              Add Expense
-            </button>
-          </div>
-          <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
-            {expenses.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Receipt className="text-gray-500 mb-2" size={32} />
-                <p className="text-gray-400 text-sm">No expenses recorded yet</p>
+        <>
+          {/* Analytics Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {/* Total This Month */}
+            <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs">This Month</span>
+                <Wallet size={14} className="text-indigo-400" />
               </div>
-            ) : (
-              <>
-                <div className="divide-y divide-gray-700">
-                  {expenses.map((exp) => (
-                    <div
-                      key={exp.id}
-                      className="p-4 hover:bg-gray-750/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                            exp.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
-                            exp.status === 'overdue' ? 'bg-rose-500/10 text-rose-400' :
-                            'bg-amber-500/10 text-amber-400'
-                          }`}>
-                            {getCategoryIcon(exp.category)}
-                          </div>
-                          <div>
+              <p className="text-xl font-bold text-white">{formatCurrency(analytics?.totalThisMonth || 0)}</p>
+            </div>
+
+            {/* Top Category */}
+            <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs">Top Category</span>
+                <TrendingUp size={14} className="text-emerald-400" />
+              </div>
+              <p className="text-sm font-bold text-white truncate">
+                {staffAnalytics.topCategory ? staffAnalytics.topCategory.category.split('&')[0].trim() : 'N/A'}
+              </p>
+              <p className="text-xs text-gray-400">{staffAnalytics.topCategory ? formatCurrency(staffAnalytics.topCategory.amount) : ''}</p>
+            </div>
+
+            {/* Daily Average */}
+            <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs">Daily Avg</span>
+                <ArrowRightLeft size={14} className="text-amber-400" />
+              </div>
+              <p className="text-xl font-bold text-white">{formatCurrency(staffAnalytics.dailyAverage)}</p>
+            </div>
+
+            {/* Pending */}
+            <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400 text-xs">Pending</span>
+                <Calendar size={14} className="text-rose-400" />
+              </div>
+              <p className="text-xl font-bold text-white">{formatCurrency(staffAnalytics.pendingAmount)}</p>
+            </div>
+          </div>
+
+          {/* Expenses List */}
+          <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-gray-200">My Expenses</h3>
+              <button
+                onClick={() => setExpenseModalOpen(true)}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              >
+                <Plus size={16} />
+                Add Expense
+              </button>
+            </div>
+            <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
+              {expenses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Receipt className="text-gray-500 mb-2" size={32} />
+                  <p className="text-gray-400 text-sm">No expenses recorded yet</p>
+                </div>
+              ) : (
+                <>
+                  <div className="divide-y divide-gray-700">
+                    {expenses.map((exp) => (
+                      <div
+                        key={exp.id}
+                        className="p-4 hover:bg-gray-750/50 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              exp.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
+                              exp.status === 'overdue' ? 'bg-rose-500/10 text-rose-400' :
+                              'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {getCategoryIcon(exp.category)}
+                            </div>
+                            <div>
                             <p className="text-sm font-medium text-white">{exp.title}</p>
                             <p className="text-xs text-gray-500 mt-0.5">{exp.category}</p>
                             <div className="flex items-center gap-2 mt-1">
@@ -193,6 +246,7 @@ const StaffPage: React.FC = () => {
             )}
           </div>
         </div>
+        </>
       )}
 
       {/* Expense Modal */}

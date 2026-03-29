@@ -438,4 +438,132 @@ router.get('/unpaid-balances', async (req, res) => {
   }
 });
 
+// GET /api/analytics/profit-summary - Returns sales, expenses, and profit summary
+router.get('/profit-summary', async (req, res) => {
+  try {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+    // Total sales (all time)
+    const totalSalesResult = await db.prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) as total FROM operations
+    `).get() as any;
+
+    // Total expenses (all time)
+    const totalExpensesResult = await db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total FROM expenses
+    `).get() as any;
+
+    // Sales this month
+    const salesThisMonthResult = await db.prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) as total
+      FROM operations
+      WHERE created_at >= ?
+    `).get(startOfMonth.toISOString()) as any;
+
+    // Sales last month
+    const salesLastMonthResult = await db.prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) as total
+      FROM operations
+      WHERE created_at >= ? AND created_at <= ?
+    `).get(startOfLastMonth.toISOString(), endOfLastMonth.toISOString()) as any;
+
+    // Expenses this month
+    const expensesThisMonthResult = await db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM expenses
+      WHERE date >= ?
+    `).get(startOfMonth.toISOString().split('T')[0]) as any;
+
+    // Expenses last month
+    const expensesLastMonthResult = await db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) as total
+      FROM expenses
+      WHERE date >= ? AND date <= ?
+    `).get(startOfLastMonth.toISOString().split('T')[0], endOfLastMonth.toISOString().split('T')[0]) as any;
+
+    // Calculate values
+    const totalSales = totalSalesResult?.total || 0;
+    const totalExpenses = totalExpensesResult?.total || 0;
+    const netProfit = totalSales - totalExpenses;
+    const salesThisMonth = salesThisMonthResult?.total || 0;
+    const expensesThisMonth = expensesThisMonthResult?.total || 0;
+    const profitThisMonth = salesThisMonth - expensesThisMonth;
+
+    // Calculate trends (% change vs last month)
+    const salesLastMonth = salesLastMonthResult?.total || 0;
+    const expensesLastMonth = expensesLastMonthResult?.total || 0;
+    const profitLastMonth = salesLastMonth - expensesLastMonth;
+
+    const salesTrend = salesLastMonth > 0
+      ? ((salesThisMonth - salesLastMonth) / salesLastMonth) * 100
+      : 0;
+    const expenseTrend = expensesLastMonth > 0
+      ? ((expensesThisMonth - expensesLastMonth) / expensesLastMonth) * 100
+      : 0;
+    const profitTrend = profitLastMonth > 0
+      ? ((profitThisMonth - profitLastMonth) / profitLastMonth) * 100
+      : 0;
+
+    // Get monthly breakdown for last 6 months
+    const monthlyBreakdownResult = await db.prepare(`
+      SELECT
+        strftime('%Y-%m', created_at) as month,
+        SUM(total_amount) as sales
+      FROM operations
+      WHERE created_at >= date('now', '-6 months')
+      GROUP BY strftime('%Y-%m', created_at)
+      ORDER BY month ASC
+    `).all() as any[];
+
+    const monthlyExpenseResult = await db.prepare(`
+      SELECT
+        strftime('%Y-%m', date) as month,
+        SUM(amount) as expenses
+      FROM expenses
+      WHERE date >= date('now', '-6 months')
+      GROUP BY strftime('%Y-%m', date)
+      ORDER BY month ASC
+    `).all() as any[];
+
+    // Combine monthly data
+    const monthlyDataMap = new Map<string, { sales: number; expenses: number; profit: number }>();
+
+    for (const row of monthlyBreakdownResult) {
+      monthlyDataMap.set(row.month, { sales: row.sales || 0, expenses: 0, profit: 0 });
+    }
+    for (const row of monthlyExpenseResult) {
+      const existing = monthlyDataMap.get(row.month) || { sales: 0, expenses: 0, profit: 0 };
+      existing.expenses = row.expenses || 0;
+      existing.profit = existing.sales - existing.expenses;
+      monthlyDataMap.set(row.month, existing);
+    }
+
+    const monthlyBreakdown = Array.from(monthlyDataMap.entries()).map(([month, data]) => ({
+      month,
+      sales: data.sales,
+      expenses: data.expenses,
+      profit: data.profit
+    })).sort((a, b) => a.month.localeCompare(b.month));
+
+    res.json({
+      totalSales,
+      totalExpenses,
+      netProfit,
+      salesThisMonth,
+      expensesThisMonth,
+      profitThisMonth,
+      salesTrend: Math.round(salesTrend * 10) / 10,
+      expenseTrend: Math.round(expenseTrend * 10) / 10,
+      profitTrend: Math.round(profitTrend * 10) / 10,
+      monthlyBreakdown
+    });
+  } catch (error) {
+    console.error('Error fetching profit summary:', error);
+    res.status(500).json({ error: 'Failed to fetch profit summary' });
+  }
+});
+
 export default router;

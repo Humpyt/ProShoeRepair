@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Package, Clock, DollarSign, User, CheckCircle, Wrench, Truck, Home } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
-import { useOperation } from '../contexts/OperationContext';
 import { format } from 'date-fns';
 
 // Helper function to safely format dates
@@ -20,18 +19,39 @@ const safeFormat = (date: string | Date | null | undefined, formatStr: string) =
 export default function OperationDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { operations } = useOperation();
   const [operation, setOperation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState<any[]>([]);
 
   useEffect(() => {
-    const foundOperation = operations.find(op => op.id === id);
-    if (foundOperation) {
-      setOperation(foundOperation);
+    const fetchOperation = async () => {
+      try {
+        const token = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const response = await fetch(`http://localhost:3000/api/operations/${id}`, { headers });
+        if (response.ok) {
+          const data = await response.json();
+          setOperation(data);
+        } else {
+          setOperation(null);
+        }
+      } catch (error) {
+        console.error('Error fetching operation:', error);
+        setOperation(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchOperation();
     }
-    setLoading(false);
-  }, [id, operations]);
+  }, [id]);
 
   useEffect(() => {
     const fetchPayments = async () => {

@@ -349,6 +349,22 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (operation_id) REFERENCES operations(id)
   );
+
+  -- Expenses table
+  CREATE TABLE IF NOT EXISTS expenses (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL,
+    date TEXT NOT NULL,
+    status TEXT DEFAULT 'pending',
+    payment_method TEXT,
+    vendor TEXT,
+    notes TEXT,
+    created_by TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Initialize database with indexes
@@ -370,6 +386,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_user_permissions_user ON user_permissions(user_id);
   CREATE INDEX IF NOT EXISTS idx_retail_products_active_order ON retail_products(is_active, display_order);
   CREATE INDEX IF NOT EXISTS idx_operation_retail_items_operation ON operation_retail_items(operation_id);
+  CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+  CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+  CREATE INDEX IF NOT EXISTS idx_expenses_status ON expenses(status);
 `);
 
 // Migration: Add image_url column to retail_products if it doesn't exist

@@ -365,7 +365,7 @@ export default function BalancesPage() {
             if (!selectedBalance) return;
             try {
               const token = localStorage.getItem('auth_token');
-              await fetch(`http://localhost:3000/api/operations/${selectedBalance.id}/payments`, {
+              const response = await fetch(`http://localhost:3000/api/operations/${selectedBalance.id}/payments`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -373,6 +373,9 @@ export default function BalancesPage() {
                 },
                 body: JSON.stringify({ payments })
               });
+              if (!response.ok) {
+                throw new Error('Payment failed');
+              }
               setPaymentModalOpen(false);
               setSelectedBalance(null);
               // Refresh operations to update the balance list

@@ -280,7 +280,7 @@ export default function OperationPage() {
           <div className="p-4 border-b border-gray-700">
             <h3 className="text-sm font-semibold text-gray-200">All Expenses</h3>
           </div>
-          <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
+          <div className="max-h-64 overflow-y-auto">
             {expenses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Receipt className="text-gray-500 mb-2" size={32} />

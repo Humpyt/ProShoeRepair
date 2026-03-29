@@ -107,7 +107,7 @@ export default function StorePage() {
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 mb-2">
-              Store Dashboard
+              {user?.name ? `${user.name}'s Dashboard` : 'Store Dashboard'}
             </h1>
             <p className="text-gray-400 text-sm md:text-base">
               {user?.name ? `Welcome back, ${user.name}!` : 'Good to see you!'} Here's today's overview at a glance.

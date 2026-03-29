@@ -95,3 +95,6 @@ export interface AuthState {
 }
 
 export type PageType = 'store' | 'customer' | 'pickup' | 'delivery';
+
+// Re-export expense types
+export * from './expense';
