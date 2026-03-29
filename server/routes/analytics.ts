@@ -594,6 +594,26 @@ router.get('/daily-balance', async (req, res) => {
       GROUP BY payment_method
     `).all(targetDate) as any[];
 
+    // Get expense details with staff names
+    const expenseDetailsResult = await db.prepare(`
+      SELECT e.*, u.name as created_by_name
+      FROM expenses e
+      LEFT JOIN users u ON e.created_by = u.id
+      WHERE e.date = ?
+      ORDER BY e.created_at DESC
+    `).all(targetDate) as any[];
+
+    const expenseDetails = expenseDetailsResult.map((e: any) => ({
+      id: e.id,
+      title: e.title,
+      category: e.category,
+      amount: e.amount,
+      paymentMethod: e.payment_method || 'Cash',
+      vendor: e.vendor || '',
+      createdByName: e.created_by_name || 'Unknown',
+      notes: e.notes || ''
+    }));
+
     // Build sales by method map
     const salesByMethod: Record<string, number> = {
       'Cash': 0,
@@ -656,11 +676,132 @@ router.get('/daily-balance', async (req, res) => {
         bankTransfer: bankTransferBalance,
         cheque: chequeBalance
       },
-      netBalance: totalSales - totalExpenses
+      netBalance: totalSales - totalExpenses,
+      expenseDetails
     });
   } catch (error) {
     console.error('Error fetching daily balance:', error);
     res.status(500).json({ error: 'Failed to fetch daily balance' });
+  }
+});
+
+// GET /api/analytics/daily-balance/archives - List all archived dates
+router.get('/daily-balance/archives', async (req, res) => {
+  try {
+    const archives = await db.prepare(`
+      SELECT id, date, sales_total, expenses_total, cash_at_hand, net_balance, created_at
+      FROM daily_balance_archives
+      ORDER BY date DESC
+      LIMIT 50
+    `).all() as any[];
+
+    res.json(archives.map((a: any) => ({
+      id: a.id,
+      date: a.date,
+      salesTotal: a.sales_total,
+      expensesTotal: a.expenses_total,
+      cashAtHand: a.cash_at_hand,
+      netBalance: a.net_balance,
+      createdAt: a.created_at
+    })));
+  } catch (error) {
+    console.error('Error fetching archives:', error);
+    res.status(500).json({ error: 'Failed to fetch archives' });
+  }
+});
+
+// GET /api/analytics/daily-balance/archives/month/:year/:month - Get archives for a specific month
+router.get('/daily-balance/archives/month/:year/:month', async (req, res) => {
+  try {
+    const { year, month } = req.params;
+    const startDate = `${year}-${month.padStart(2, '0')}-01`;
+    const endDate = `${year}-${month.padStart(2, '0')}-31`;
+
+    const archives = await db.prepare(`
+      SELECT id, date, sales_total, expenses_total, cash_at_hand, net_balance
+      FROM daily_balance_archives
+      WHERE date >= ? AND date <= ?
+      ORDER BY date ASC
+    `).all(startDate, endDate) as any[];
+
+    res.json(archives.map((a: any) => ({
+      date: a.date,
+      hasArchive: true
+    })));
+  } catch (error) {
+    console.error('Error fetching month archives:', error);
+    res.status(500).json({ error: 'Failed to fetch month archives' });
+  }
+});
+
+// GET /api/analytics/daily-balance/archive/:date - Get archived balance for specific date
+router.get('/daily-balance/archive/:date', async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    const archive = await db.prepare(`
+      SELECT * FROM daily_balance_archives WHERE date = ?
+    `).get(date) as any;
+
+    if (!archive) {
+      return res.status(404).json({ error: 'Archive not found for this date' });
+    }
+
+    res.json(JSON.parse(archive.data_json));
+  } catch (error) {
+    console.error('Error fetching archive:', error);
+    res.status(500).json({ error: 'Failed to fetch archive' });
+  }
+});
+
+// POST /api/analytics/daily-balance/archive - Save current balance sheet as archive
+router.post('/daily-balance/archive', async (req, res) => {
+  try {
+    const { date, data } = req.body;
+
+    // Check if archive already exists for this date
+    const existing = await db.prepare(`
+      SELECT id FROM daily_balance_archives WHERE date = ?
+    `).get(date) as any;
+
+    const id = existing?.id || `archive_${date}_${Date.now()}`;
+    const now = new Date().toISOString();
+
+    if (existing) {
+      // Update existing archive
+      await db.prepare(`
+        UPDATE daily_balance_archives
+        SET sales_total = ?, expenses_total = ?, cash_at_hand = ?, net_balance = ?, data_json = ?, created_at = ?
+        WHERE date = ?
+      `).run(data.sales.total, data.expenses.total, data.balance.cashAtHand, data.netBalance, JSON.stringify(data), now, date);
+    } else {
+      // Insert new archive
+      await db.prepare(`
+        INSERT INTO daily_balance_archives (id, date, sales_total, expenses_total, cash_at_hand, net_balance, data_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, date, data.sales.total, data.expenses.total, data.balance.cashAtHand, data.netBalance, JSON.stringify(data), now);
+    }
+
+    res.json({ success: true, id, date });
+  } catch (error) {
+    console.error('Error saving archive:', error);
+    res.status(500).json({ error: 'Failed to save archive' });
+  }
+});
+
+// DELETE /api/analytics/daily-balance/archive/:date - Delete an archive
+router.delete('/daily-balance/archive/:date', async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    await db.prepare(`
+      DELETE FROM daily_balance_archives WHERE date = ?
+    `).run(date);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting archive:', error);
+    res.status(500).json({ error: 'Failed to delete archive' });
   }
 });
 

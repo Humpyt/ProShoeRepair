@@ -365,6 +365,19 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- Daily balance archives table
+  CREATE TABLE IF NOT EXISTS daily_balance_archives (
+    id TEXT PRIMARY KEY,
+    date TEXT UNIQUE NOT NULL,
+    sales_total REAL NOT NULL,
+    expenses_total REAL NOT NULL,
+    cash_at_hand REAL NOT NULL,
+    net_balance REAL NOT NULL,
+    data_json TEXT NOT NULL,
+    created_by TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Initialize database with indexes

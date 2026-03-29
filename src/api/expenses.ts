@@ -179,6 +179,16 @@ export interface DailyBalance {
     cheque: number;
   };
   netBalance: number;
+  expenseDetails: Array<{
+    id: string;
+    title: string;
+    category: string;
+    amount: number;
+    paymentMethod: string;
+    vendor: string;
+    createdByName: string;
+    notes: string;
+  }>;
 }
 
 export const getDailyBalance = async (date?: string): Promise<DailyBalance> => {
@@ -189,6 +199,84 @@ export const getDailyBalance = async (date?: string): Promise<DailyBalance> => {
 
   if (!response.ok) {
     throw new Error('Failed to fetch daily balance');
+  }
+
+  return response.json();
+};
+
+export interface BalanceArchive {
+  id: string;
+  date: string;
+  salesTotal: number;
+  expensesTotal: number;
+  cashAtHand: number;
+  netBalance: number;
+  createdAt: string;
+}
+
+export interface ArchivedDate {
+  date: string;
+  hasArchive: boolean;
+}
+
+export const getBalanceArchives = async (): Promise<BalanceArchive[]> => {
+  const response = await fetch(`${API_BASE}/analytics/daily-balance/archives`, {
+    headers: getHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch archives');
+  }
+
+  return response.json();
+};
+
+export const getMonthArchives = async (year: number, month: number): Promise<ArchivedDate[]> => {
+  const response = await fetch(`${API_BASE}/analytics/daily-balance/archives/month/${year}/${month}`, {
+    headers: getHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch month archives');
+  }
+
+  return response.json();
+};
+
+export const getBalanceArchive = async (date: string): Promise<DailyBalance> => {
+  const response = await fetch(`${API_BASE}/analytics/daily-balance/archive/${date}`, {
+    headers: getHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch archive');
+  }
+
+  return response.json();
+};
+
+export const saveBalanceArchive = async (date: string, data: DailyBalance): Promise<{ success: boolean; id: string; date: string }> => {
+  const response = await fetch(`${API_BASE}/analytics/daily-balance/archive`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ date, data })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to save archive');
+  }
+
+  return response.json();
+};
+
+export const deleteBalanceArchive = async (date: string): Promise<{ success: boolean }> => {
+  const response = await fetch(`${API_BASE}/analytics/daily-balance/archive/${date}`, {
+    method: 'DELETE',
+    headers: getHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete archive');
   }
 
   return response.json();

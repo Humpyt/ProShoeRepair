@@ -10,7 +10,6 @@ import BalancesPage from './pages/BalancesPage';
 import MessagePage from './pages/MessagePage';
 import OperationPage from './pages/OperationPage';
 import OperationDetailsPage from './pages/OperationDetailsPage';
-import SuppliesPage from './pages/SuppliesPage';
 import SalesPage from './pages/SalesPage';
 import SalesItems from './pages/SalesItems';
 import TicketsPage from './pages/TicketsPage';
@@ -211,11 +210,6 @@ function App() {
                       <Route path="operation" element={
                         <ProtectedRoute permission="view_operations">
                           <OperationPage />
-                        </ProtectedRoute>
-                      } />
-                      <Route path="supplies" element={
-                        <ProtectedRoute permission="manage_supplies" requiredRoles={['admin', 'manager']}>
-                          <SuppliesPage />
                         </ProtectedRoute>
                       } />
                       <Route path="expenses" element={

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Clock, Filter, Search, Package, DollarSign, CheckCircle, Receipt, TrendingUp, TrendingDown, Wallet, Minus, ArrowRightLeft, Printer, FileDown, X } from 'lucide-react';
+import { Calendar, Clock, Filter, Search, Package, DollarSign, CheckCircle, Receipt, TrendingUp, TrendingDown, Wallet, Minus, ArrowRightLeft, Printer, FileDown, X, ChevronLeft, ChevronRight, Save, Archive, Trash2 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useOperation } from '../contexts/OperationContext';
 import { useAuthStore } from '../store/authStore';
 import { useExpenses } from '../contexts/ExpenseContext';
-import { getProfitSummary, ProfitSummary, getDailyBalance, DailyBalance } from '../api/expenses';
-import { format } from 'date-fns';
+import { getProfitSummary, ProfitSummary, getDailyBalance, DailyBalance, getBalanceArchives, getMonthArchives, getBalanceArchive, saveBalanceArchive, deleteBalanceArchive, BalanceArchive } from '../api/expenses';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 
 // Helper function to safely format dates
 const safeFormat = (date: string | Date | null | undefined, formatStr: string) => {
@@ -34,6 +34,11 @@ export default function OperationPage() {
   const [balanceSheetDate, setBalanceSheetDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [dailyBalance, setDailyBalance] = useState<DailyBalance | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [showExpenseDetails, setShowExpenseDetails] = useState(false);
+  const [archives, setArchives] = useState<BalanceArchive[]>([]);
+  const [archivedDates, setArchivedDates] = useState<Set<string>>(new Set());
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [isFromArchive, setIsFromArchive] = useState(false);
   const balanceRef = useRef<HTMLDivElement>(null);
 
   // Fetch balance sheet data
@@ -48,6 +53,98 @@ export default function OperationPage() {
       setBalanceLoading(false);
     }
   }, [balanceSheetDate]);
+
+  // Fetch archives when modal opens
+  useEffect(() => {
+    if (balanceSheetOpen) {
+      fetchBalanceSheet();
+      fetchArchivesList();
+      fetchMonthArchives(calendarMonth);
+    }
+  }, [balanceSheetOpen]);
+
+  // Fetch archives list
+  const fetchArchivesList = async () => {
+    try {
+      const data = await getBalanceArchives();
+      setArchives(data);
+    } catch (error) {
+      console.error('Failed to fetch archives:', error);
+    }
+  };
+
+  // Fetch archived dates for calendar month
+  const fetchMonthArchives = async (month: Date) => {
+    try {
+      const year = month.getFullYear();
+      const monthNum = month.getMonth() + 1;
+      const data = await getMonthArchives(year, monthNum);
+      setArchivedDates(new Set(data.map(d => d.date)));
+    } catch (error) {
+      console.error('Failed to fetch month archives:', error);
+    }
+  };
+
+  // Handle archive save
+  const handleSaveArchive = async () => {
+    if (!dailyBalance) return;
+    try {
+      await saveBalanceArchive(balanceSheetDate, dailyBalance);
+      await fetchArchivesList();
+      await fetchMonthArchives(calendarMonth);
+      alert('Balance sheet saved to archive!');
+    } catch (error) {
+      console.error('Failed to save archive:', error);
+      alert('Failed to save archive');
+    }
+  };
+
+  // Handle archive delete
+  const handleDeleteArchive = async () => {
+    if (!confirm('Delete this archived balance sheet?')) return;
+    try {
+      await deleteBalanceArchive(balanceSheetDate);
+      await fetchArchivesList();
+      await fetchMonthArchives(calendarMonth);
+      setIsFromArchive(false);
+    } catch (error) {
+      console.error('Failed to delete archive:', error);
+    }
+  };
+
+  // Handle calendar date click
+  const handleCalendarDateClick = async (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    setBalanceSheetDate(dateStr);
+    setBalanceLoading(true);
+    setIsFromArchive(archivedDates.has(dateStr));
+    try {
+      if (archivedDates.has(dateStr)) {
+        const data = await getBalanceArchive(dateStr);
+        setDailyBalance(data);
+      } else {
+        const data = await getDailyBalance(dateStr);
+        setDailyBalance(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  // Navigate calendar month
+  const handlePrevMonth = () => {
+    const newMonth = subMonths(calendarMonth, 1);
+    setCalendarMonth(newMonth);
+    fetchMonthArchives(newMonth);
+  };
+
+  const handleNextMonth = () => {
+    const newMonth = addMonths(calendarMonth, 1);
+    setCalendarMonth(newMonth);
+    fetchMonthArchives(newMonth);
+  };
 
   useEffect(() => {
     if (balanceSheetOpen) {
@@ -646,27 +743,51 @@ export default function OperationPage() {
       {/* Balance Sheet Modal */}
       {balanceSheetOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-gray-800 rounded-2xl border border-gray-700 w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="p-6 border-b border-gray-700 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold text-white">Daily Balance Sheet</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="date"
-                    value={balanceSheetDate}
-                    onChange={(e) => setBalanceSheetDate(e.target.value)}
-                    className="px-3 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
-                  />
-                  <button
-                    onClick={fetchBalanceSheet}
-                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm"
-                  >
-                    Load
-                  </button>
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-white">Daily Balance Sheet</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="date"
+                      value={balanceSheetDate}
+                      onChange={(e) => { setBalanceSheetDate(e.target.value); setIsFromArchive(false); }}
+                      className="px-3 py-1 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm"
+                    />
+                    <button
+                      onClick={fetchBalanceSheet}
+                      className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm"
+                    >
+                      Load
+                    </button>
+                    {isFromArchive && (
+                      <span className="px-2 py-1 bg-emerald-600/20 text-emerald-400 text-xs rounded flex items-center gap-1">
+                        <Archive size={12} /> From Archive
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSaveArchive}
+                  className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm"
+                  title="Save to Archive"
+                >
+                  <Save size={16} />
+                  Save
+                </button>
+                {isFromArchive && (
+                  <button
+                    onClick={handleDeleteArchive}
+                    className="flex items-center gap-2 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-sm"
+                    title="Delete Archive"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
                 <button
                   onClick={handlePrint}
                   className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
@@ -679,7 +800,7 @@ export default function OperationPage() {
                   className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm"
                 >
                   <FileDown size={16} />
-                  Save PDF
+                  PDF
                 </button>
                 <button
                   onClick={() => setBalanceSheetOpen(false)}
@@ -691,120 +812,234 @@ export default function OperationPage() {
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6" ref={balanceRef}>
-              {balanceLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+            <div className="flex-1 overflow-hidden flex">
+              {/* Calendar Sidebar */}
+              <div className="w-72 border-r border-gray-700 p-4 overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <button onClick={handlePrevMonth} className="p-1 hover:bg-gray-700 rounded">
+                    <ChevronLeft size={20} className="text-gray-400" />
+                  </button>
+                  <h3 className="text-sm font-semibold text-white">
+                    {format(calendarMonth, 'MMMM yyyy')}
+                  </h3>
+                  <button onClick={handleNextMonth} className="p-1 hover:bg-gray-700 rounded">
+                    <ChevronRight size={20} className="text-gray-400" />
+                  </button>
                 </div>
-              ) : dailyBalance ? (
-                <div className="space-y-6">
-                  {/* Date Header */}
-                  <div className="text-center border-b border-gray-700 pb-4">
-                    <h3 className="text-lg font-semibold text-white">Balance Sheet</h3>
-                    <p className="text-gray-400 text-sm">{format(new Date(dailyBalance.date), 'MMMM d, yyyy')}</p>
-                  </div>
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
+                    <div key={day} className="text-xs text-gray-500 font-medium py-1">{day}</div>
+                  ))}
+                  {eachDayOfInterval({ start: startOfMonth(calendarMonth), end: endOfMonth(calendarMonth) }).map(day => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const isSelected = dateStr === balanceSheetDate;
+                    const hasArchive = archivedDates.has(dateStr);
+                    const isToday = isSameDay(day, new Date());
+                    return (
+                      <button
+                        key={dateStr}
+                        onClick={() => handleCalendarDateClick(day)}
+                        className={`
+                          relative p-1 text-xs rounded transition-all
+                          ${isSelected ? 'bg-indigo-600 text-white' : 'hover:bg-gray-700 text-gray-300'}
+                          ${isToday && !isSelected ? 'border border-indigo-500' : ''}
+                        `}
+                      >
+                        {format(day, 'd')}
+                        {hasArchive && (
+                          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-emerald-500 rounded-full" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  {/* Sales Section */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide mb-3">Day's Sales</h4>
-                    <div className="bg-gray-900/50 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
-                        <tbody>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Cash Sales</td>
-                            <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.cash)}</td>
-                          </tr>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Mobile Money</td>
-                            <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.mobileMoney)}</td>
-                          </tr>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Card Payments</td>
-                            <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.card)}</td>
-                          </tr>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Bank Transfer</td>
-                            <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.bankTransfer)}</td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-2 text-gray-300">Cheque</td>
-                            <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.cheque)}</td>
-                          </tr>
-                          <tr className="total-row border-t-2 border-gray-600">
-                            <td className="px-4 py-2 text-white font-bold">Total Sales</td>
-                            <td className="px-4 py-2 text-right text-white font-bold">{formatCurrency(dailyBalance.sales.total)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Expenses Section */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-rose-400 uppercase tracking-wide mb-3">Less: Expenses</h4>
-                    <div className="bg-gray-900/50 rounded-xl overflow-hidden">
-                      <table className="w-full text-sm">
-                        <tbody>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Cash Expenses</td>
-                            <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.cash)}</td>
-                          </tr>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Mobile Money Expenses</td>
-                            <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.mobileMoney)}</td>
-                          </tr>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Card Expenses</td>
-                            <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.card)}</td>
-                          </tr>
-                          <tr className="border-b border-gray-700">
-                            <td className="px-4 py-2 text-gray-300">Bank Transfer Expenses</td>
-                            <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.bankTransfer)}</td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-2 text-gray-300">Cheque Expenses</td>
-                            <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.cheque)}</td>
-                          </tr>
-                          <tr className="total-row border-t-2 border-gray-600">
-                            <td className="px-4 py-2 text-white font-bold">Total Expenses</td>
-                            <td className="px-4 py-2 text-right text-rose-400 font-bold">-{formatCurrency(dailyBalance.expenses.total)}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Cash at Hand Section */}
-                  <div>
-                    <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-xl p-4">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h4 className="text-sm font-semibold text-emerald-400 uppercase tracking-wide">Cash at Hand</h4>
-                          <p className="text-xs text-gray-400 mt-1">Cash Sales minus Cash Expenses</p>
+                {/* Recent Archives */}
+                <div className="mt-6">
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Recent Archives</h4>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {archives.slice(0, 10).map(archive => (
+                      <button
+                        key={archive.id}
+                        onClick={() => {
+                          setBalanceSheetDate(archive.date);
+                          setIsFromArchive(true);
+                          setBalanceLoading(true);
+                          getBalanceArchive(archive.date).then(setDailyBalance).finally(() => setBalanceLoading(false));
+                        }}
+                        className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-gray-700 transition-colors ${
+                          archive.date === balanceSheetDate ? 'bg-indigo-600/30 text-indigo-300' : 'text-gray-400'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span>{format(new Date(archive.date), 'MMM d, yyyy')}</span>
+                          <span className="text-emerald-400">{formatCurrency(archive.cashAtHand)}</span>
                         </div>
-                        <p className={`text-2xl font-bold ${dailyBalance.balance.cashAtHand >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                          {formatCurrency(dailyBalance.balance.cashAtHand)}
-                        </p>
+                      </button>
+                    ))}
+                    {archives.length === 0 && (
+                      <p className="text-xs text-gray-500 italic">No archives yet</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Content */}
+              <div className="flex-1 overflow-y-auto p-6" ref={balanceRef}>
+                {balanceLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+                  </div>
+                ) : dailyBalance ? (
+                  <div className="space-y-6">
+                    {/* Date Header */}
+                    <div className="text-center border-b border-gray-700 pb-4">
+                      <h3 className="text-lg font-semibold text-white">Balance Sheet</h3>
+                      <p className="text-gray-400 text-sm">{format(new Date(dailyBalance.date), 'MMMM d, yyyy')}</p>
+                    </div>
+
+                    {/* Sales Section */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-indigo-400 uppercase tracking-wide mb-3">Day's Sales</h4>
+                      <div className="bg-gray-900/50 rounded-xl overflow-hidden">
+                        <table className="w-full text-sm">
+                          <tbody>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Cash Sales</td>
+                              <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.cash)}</td>
+                            </tr>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Mobile Money</td>
+                              <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.mobileMoney)}</td>
+                            </tr>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Card Payments</td>
+                              <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.card)}</td>
+                            </tr>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Bank Transfer</td>
+                              <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.bankTransfer)}</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 text-gray-300">Cheque</td>
+                              <td className="px-4 py-2 text-right text-white font-medium">{formatCurrency(dailyBalance.sales.byMethod.cheque)}</td>
+                            </tr>
+                            <tr className="total-row border-t-2 border-gray-600">
+                              <td className="px-4 py-2 text-white font-bold">Total Sales</td>
+                              <td className="px-4 py-2 text-right text-white font-bold">{formatCurrency(dailyBalance.sales.total)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Summary */}
-                  <div className="bg-gray-900/50 rounded-xl p-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">Net Balance</span>
-                      <span className={`text-lg font-bold ${dailyBalance.netBalance >= 0 ? 'text-white' : 'text-rose-400'}`}>
-                        {formatCurrency(dailyBalance.netBalance)}
-                      </span>
+                    {/* Expenses Section */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-rose-400 uppercase tracking-wide mb-3">Less: Expenses</h4>
+                      <div className="bg-gray-900/50 rounded-xl overflow-hidden">
+                        <table className="w-full text-sm">
+                          <tbody>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Cash Expenses</td>
+                              <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.cash)}</td>
+                            </tr>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Mobile Money Expenses</td>
+                              <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.mobileMoney)}</td>
+                            </tr>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Card Expenses</td>
+                              <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.card)}</td>
+                            </tr>
+                            <tr className="border-b border-gray-700">
+                              <td className="px-4 py-2 text-gray-300">Bank Transfer Expenses</td>
+                              <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.bankTransfer)}</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 text-gray-300">Cheque Expenses</td>
+                              <td className="px-4 py-2 text-right text-rose-400 font-medium">-{formatCurrency(dailyBalance.expenses.byMethod.cheque)}</td>
+                            </tr>
+                            <tr className="total-row border-t-2 border-gray-600">
+                              <td className="px-4 py-2 text-white font-bold">Total Expenses</td>
+                              <td className="px-4 py-2 text-right text-rose-400 font-bold">-{formatCurrency(dailyBalance.expenses.total)}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Total Sales - Total Expenses</p>
+
+                    {/* Expense Details Section */}
+                    {dailyBalance.expenseDetails && dailyBalance.expenseDetails.length > 0 && (
+                      <div>
+                        <button
+                          onClick={() => setShowExpenseDetails(!showExpenseDetails)}
+                          className="flex items-center gap-2 text-sm font-semibold text-rose-400 uppercase tracking-wide mb-3 hover:text-rose-300"
+                        >
+                          <ChevronRight size={16} className={`transform transition-transform ${showExpenseDetails ? 'rotate-90' : ''}`} />
+                          Expense Details ({dailyBalance.expenseDetails.length})
+                        </button>
+                        {showExpenseDetails && (
+                          <div className="bg-gray-900/50 rounded-xl overflow-hidden">
+                            <table className="w-full text-xs">
+                              <thead className="bg-gray-700/50">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-gray-400 font-medium">Title</th>
+                                  <th className="px-3 py-2 text-left text-gray-400 font-medium">Category</th>
+                                  <th className="px-3 py-2 text-left text-gray-400 font-medium">Staff</th>
+                                  <th className="px-3 py-2 text-left text-gray-400 font-medium">Vendor</th>
+                                  <th className="px-3 py-2 text-right text-gray-400 font-medium">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-700">
+                                {dailyBalance.expenseDetails.map((exp) => (
+                                  <tr key={exp.id} className="hover:bg-gray-700/30">
+                                    <td className="px-3 py-2 text-white">{exp.title}</td>
+                                    <td className="px-3 py-2 text-gray-400">{exp.category.split('&')[0].trim()}</td>
+                                    <td className="px-3 py-2 text-indigo-400">{exp.createdByName}</td>
+                                    <td className="px-3 py-2 text-gray-400">{exp.vendor || '-'}</td>
+                                    <td className="px-3 py-2 text-right text-rose-400 font-medium">{formatCurrency(exp.amount)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Cash at Hand Section */}
+                    <div>
+                      <div className="bg-emerald-900/30 border border-emerald-700/50 rounded-xl p-4">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <h4 className="text-sm font-semibold text-emerald-400 uppercase tracking-wide">Cash at Hand</h4>
+                            <p className="text-xs text-gray-400 mt-1">Cash Sales minus Cash Expenses</p>
+                          </div>
+                          <p className={`text-2xl font-bold ${dailyBalance.balance.cashAtHand >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {formatCurrency(dailyBalance.balance.cashAtHand)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="bg-gray-900/50 rounded-xl p-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-300">Net Balance</span>
+                        <span className={`text-lg font-bold ${dailyBalance.netBalance >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                          {formatCurrency(dailyBalance.netBalance)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Total Sales - Total Expenses</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-12 text-gray-400">
-                  Select a date and click Load to view balance sheet
-                </div>
-              )}
+                ) : (
+                  <div className="text-center py-12 text-gray-400">
+                    Select a date from the calendar or enter a date and click Load
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
