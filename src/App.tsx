@@ -44,6 +44,7 @@ import PickupOrderPage from './pages/PickupOrderPage';
 import DeliveriesPage from './pages/DeliveriesPage';
 import CodPaymentPage from './pages/CodPaymentPage';
 import ProductCategoryManager from './pages/ProductCategoryManager';
+import ExpensesPage from './pages/ExpensesPage';
 import ReadyToPickPage from './pages/ReadyToPickPage';
 import CommissionsPage from './pages/CommissionsPage';
 import InvoicesPage from './pages/InvoicesPage';
@@ -209,6 +210,11 @@ function App() {
                       <Route path="operation" element={
                         <ProtectedRoute permission="view_operations">
                           <OperationPage />
+                        </ProtectedRoute>
+                      } />
+                      <Route path="expenses" element={
+                        <ProtectedRoute requiredRoles={['admin', 'manager', 'staff']}>
+                          <ExpensesPage />
                         </ProtectedRoute>
                       } />
                       <Route path="sales" element={
