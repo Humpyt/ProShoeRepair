@@ -230,7 +230,7 @@ export function Staff() {
                 Update Progress
               </button>
               <button
-                onClick={() => navigate(`/commissions?staff=${member.id}&name=${encodeURIComponent(member.name)}`)}
+                onClick={() => navigate(`/business-targets?staff=${member.id}&name=${encodeURIComponent(member.name)}`)}
                 className="text-sm text-yellow-400 hover:text-yellow-300 flex items-center"
               >
                 <Trophy className="h-4 w-4 mr-1" />
@@ -302,7 +302,7 @@ export function Staff() {
 
             <div className="flex items-center gap-2 justify-end">
               <button
-                onClick={() => navigate(`/commissions?staff=${member.id}&name=${encodeURIComponent(member.name)}`)}
+                onClick={() => navigate(`/business-targets?staff=${member.id}&name=${encodeURIComponent(member.name)}`)}
                 className="text-yellow-400 hover:text-yellow-300 flex items-center text-sm"
               >
                 <Trophy className="h-4 w-4 mr-1" />

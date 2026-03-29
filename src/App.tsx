@@ -46,7 +46,6 @@ import CodPaymentPage from './pages/CodPaymentPage';
 import ProductCategoryManager from './pages/ProductCategoryManager';
 import ExpensesPage from './pages/ExpensesPage';
 import ReadyToPickPage from './pages/ReadyToPickPage';
-import CommissionsPage from './pages/CommissionsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import UnpaidBalancesPage from './pages/UnpaidBalancesPage';
 import DiscountsPage from './pages/DiscountsPage';
@@ -268,7 +267,6 @@ function App() {
                       <Route path="deliveries" element={<DeliveriesPage />} />
                       <Route path="cod-payment" element={<CodPaymentPage />} />
                       <Route path="ready-to-pick" element={<ReadyToPickPage />} />
-                      <Route path="commissions" element={<CommissionsPage />} />
                       <Route path="unpaid-balances" element={<UnpaidBalancesPage />} />
                       <Route path="discounts" element={<DiscountsPage />} />
                       <Route path="new-customers" element={<NewCustomersPage />} />

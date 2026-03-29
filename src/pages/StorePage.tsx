@@ -12,6 +12,11 @@ import {
   faPercent, faUserPlus, faTrophy, faStar, faCreditCard, faMoneyBillWave
 } from '@fortawesome/free-solid-svg-icons';
 
+// Target thresholds - module level constants
+const ADMIN_MONTHLY = { red: 30000000, orange: 80000000, green: 104000000 };
+const ADMIN_DAILY = { red: 1500000, orange: 2500000, green: 4000000 };
+const STAFF_MONTHLY = { red: 8000000, orange: 18000000, green: 26000000 };
+
 export default function StorePage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -19,9 +24,7 @@ export default function StorePage() {
   const [loading, setLoading] = useState(true);
   const [dashboardStats, setDashboardStats] = useState({
     monthlyCollected: 0,
-    monthlyTarget: 1000000,
     dailyCollected: 0,
-    dailyTarget: 300000,
     jobsMonthly: 0,
     jobsToday: 0,
     jobsPending: 0,
@@ -29,6 +32,11 @@ export default function StorePage() {
   });
 
   const canSeeAllData = user?.role === 'admin' || user?.role === 'manager';
+
+  // Determine targets based on user role
+  const isAdmin = user?.role === 'admin';
+  const monthlyThresholds = isAdmin ? ADMIN_MONTHLY : STAFF_MONTHLY;
+  const dailyThresholds = ADMIN_DAILY;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -71,8 +79,6 @@ export default function StorePage() {
           jobsToday: jobsToday.length,
           jobsPending: jobsThisMonth.filter((op: any) => op.status === 'pending').length,
           jobsCollectedMonth: jobsThisMonth.filter((op: any) => op.status === 'completed').length,
-          monthlyTarget: 1000000,
-          dailyTarget: 300000,
         });
       } catch (error) {
         console.error('Error fetching store data:', error);
@@ -86,44 +92,111 @@ export default function StorePage() {
 
   const handleQuickAction = (path: string) => navigate(path);
 
-  // Helper component for the segmented progress bars
-  const SegmentedProgressBar = ({ value, max }: { value: number, max: number }) => {
-    const p1 = Math.min(100, (value / (max * 0.3)) * 100);
-    const v2 = Math.max(0, value - (max * 0.3));
-    const p2 = Math.min(100, (v2 / (max * 0.5)) * 100);
-    const v3 = Math.max(0, value - (max * 0.8));
-    const p3 = Math.min(100, (v3 / (max * 0.2)) * 100);
+  // Segmented progress bar with threshold colors
+  const SegmentedProgressBar = ({ value, thresholds }: { value: number, thresholds: { red: number, orange: number, green: number } }) => {
+    const max = thresholds.green;
+    const redWidth = (thresholds.red / max) * 100;
+    const orangeWidth = ((thresholds.orange - thresholds.red) / max) * 100;
+    const greenWidth = ((thresholds.green - thresholds.orange) / max) * 100;
+
+    // Calculate fill percentages for each segment
+    const redFill = Math.min(100, (value / thresholds.red) * 100);
+    const orangeFill = Math.min(100, Math.max(0, (value - thresholds.red) / (thresholds.orange - thresholds.red)) * 100);
+    const greenFill = Math.min(100, Math.max(0, (value - thresholds.orange) / (thresholds.green - thresholds.orange)) * 100);
+
+    const isOverRed = value > thresholds.red;
+    const isOverOrange = value > thresholds.orange;
+    const isOverGreen = value > thresholds.green;
 
     return (
-      <div className="flex w-full gap-x-1 h-3 rounded-full overflow-hidden bg-gray-900 shadow-inner">
-        <div className="w-[30%] h-full bg-gray-800 relative">
-          <div className="absolute left-0 top-0 h-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)] transition-all duration-1000 ease-out" style={{ width: `${p1}%` }} />
+      <div className="flex w-full gap-x-0.5 h-4 rounded-full overflow-hidden shadow-inner">
+        {/* Red segment */}
+        <div className="h-full bg-gray-800 relative" style={{ width: `${redWidth}%` }}>
+          <div
+            className="absolute left-0 top-0 h-full bg-gradient-to-r from-red-600 to-red-500 transition-all duration-700 ease-out rounded-l-full"
+            style={{ width: `${isOverRed ? 100 : redFill}%` }}
+          />
         </div>
-        <div className="w-[50%] h-full bg-gray-800 relative">
-          <div className="absolute left-0 top-0 h-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)] transition-all duration-1000 ease-out delay-150" style={{ width: `${p2}%` }} />
+        {/* Orange segment */}
+        <div className="h-full bg-gray-800 relative" style={{ width: `${orangeWidth}%` }}>
+          <div
+            className="absolute left-0 top-0 h-full bg-gradient-to-r from-orange-600 to-amber-500 transition-all duration-700 ease-out"
+            style={{ width: `${isOverOrange ? 100 : orangeFill}%` }}
+          />
         </div>
-        <div className="w-[20%] h-full bg-gray-800 relative">
-          <div className="absolute left-0 top-0 h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000 ease-out delay-300" style={{ width: `${p3}%` }} />
+        {/* Green segment */}
+        <div className="h-full bg-gray-800 relative" style={{ width: `${greenWidth}%` }}>
+          <div
+            className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-600 to-emerald-400 transition-all duration-700 ease-out rounded-r-full"
+            style={{ width: `${isOverGreen ? 100 : greenFill}%` }}
+          />
         </div>
       </div>
     );
   };
 
-  const BarWithLabels = ({ label, value, max, showLabels }: { label: string, value: number, max: number, showLabels?: boolean }) => (
-    <div className="w-full flex items-center justify-between mt-3 mb-1">
-      <span className="text-gray-200 text-sm font-semibold w-[35%] lg:w-[30%]">{label}</span>
-      <div className="w-[65%] lg:w-[70%] flex flex-col gap-1">
-        {showLabels && (
-          <div className="flex w-full gap-x-1 text-[9px] text-gray-400 font-mono tracking-tighter text-center opacity-80">
-            <div className="w-[30%]">(0-{(max * 0.3).toLocaleString()})</div>
-            <div className="w-[50%]">({(max * 0.3).toLocaleString()}-{(max * 0.8).toLocaleString()})</div>
-            <div className="w-[20%]">({(max * 0.8).toLocaleString()}-{max.toLocaleString()})</div>
+  // Revenue card with segmented progress bar
+  const RevenueCard = ({
+    title,
+    value,
+    thresholds,
+    period
+  }: {
+    title: string;
+    value: number;
+    thresholds: { red: number; orange: number; green: number };
+    period: string;
+  }) => {
+    const max = thresholds.green;
+    const percent = Math.min(100, (value / max) * 100);
+    const balance = Math.max(0, max - value);
+
+    // Determine current zone color
+    let zoneColor = 'text-red-400';
+    if (value >= thresholds.orange) zoneColor = 'text-orange-400';
+    if (value >= thresholds.green) zoneColor = 'text-emerald-400';
+
+    return (
+      <div className="group relative flex flex-col justify-between rounded-2xl bg-gray-900/40 border border-white/5 p-6 shadow-xl transition-all duration-500 hover:bg-gray-800/50 overflow-hidden">
+        <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-2xl group-hover:bg-indigo-500/20 transition-all duration-500"></div>
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-purple-500/5 blur-2xl"></div>
+
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-gray-300 text-sm font-medium flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${value >= thresholds.green ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]' : value >= thresholds.orange ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.6)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]'}`}></span>
+              {title}
+            </p>
+            <span className={`text-sm font-bold ${zoneColor}`}>{percent.toFixed(1)}%</span>
           </div>
-        )}
-        <SegmentedProgressBar value={value} max={max} />
+
+          <SegmentedProgressBar value={value} thresholds={thresholds} />
+
+          {/* Zone labels */}
+          <div className="flex justify-between mt-1 text-[9px] text-gray-500 font-mono">
+            <span>0-{thresholds.red.toLocaleString()}</span>
+            <span>{thresholds.red.toLocaleString()}-{thresholds.orange.toLocaleString()}</span>
+            <span>{thresholds.orange.toLocaleString()}-{thresholds.green.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-4 pt-4 border-t border-white/5">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-gray-400">Collected</span>
+            <span className="text-sm font-bold text-emerald-400">{value.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs text-gray-400">Target</span>
+            <span className="text-sm text-gray-300">{max.toLocaleString()}</span>
+          </div>
+          <div className="flex justify-between items-center mt-1">
+            <span className="text-xs text-gray-400">Balance</span>
+            <span className="text-sm font-medium text-amber-400">{balance.toLocaleString()}</span>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const operations = [
     { label: 'Code Payment', icon: faMoneyBillTransfer, path: '/cod-payment', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:border-emerald-500 hover:bg-emerald-500/20' },
@@ -142,7 +215,7 @@ export default function StorePage() {
     { label: 'Low stock', icon: faBoxesStacked, path: '/supplies', count: 5, color: 'from-orange-500 to-amber-600' },
     { label: 'Expenses', icon: faMoneyBillTransfer, path: '/expenses', count: 3, color: 'from-blue-500 to-cyan-600' },
     { label: 'Staff performance', icon: faChartLine, path: '/business-targets', count: 4, color: 'from-purple-500 to-fuchsia-600' },
-    { label: 'Commissions', icon: faCoins, path: '/commissions', count: 2, color: 'from-yellow-500 to-orange-600' }
+    { label: 'Commissions', icon: faCoins, path: '/business-targets', count: 2, color: 'from-yellow-500 to-orange-600' }
   ];
 
   return (
@@ -175,50 +248,22 @@ export default function StorePage() {
 
         {/* New Advanced Stats Grid under Hero */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8 relative z-10">
-          
+
           {/* Card 1: Monthly Revenue */}
-          <div className="group relative flex flex-col justify-between rounded-2xl bg-gray-900/40 border border-white/5 p-6 shadow-xl transition-all duration-500 hover:bg-gray-800/50 overflow-hidden">
-            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-emerald-500/10 blur-2xl group-hover:bg-emerald-500/20 transition-all duration-500"></div>
-            <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-blue-500/5 blur-2xl"></div>
-            
-            <div className="relative z-10">
-              <p className="text-gray-300 text-sm font-medium mb-4 flex items-center">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
-                Total Monthly revenue collected- {format(currentTime, 'MMM yyyy')} - 
-                <span className="text-white font-bold ml-1">${dashboardStats.monthlyCollected.toLocaleString()}</span>
-              </p>
-              
-              <BarWithLabels label="Monthly Sales" value={dashboardStats.monthlyCollected} max={dashboardStats.monthlyTarget} showLabels={true} />
-              <BarWithLabels label="Balance to target:" value={Math.max(0, dashboardStats.monthlyTarget - dashboardStats.monthlyCollected)} max={dashboardStats.monthlyTarget} />
-            </div>
-            
-            <div className="relative z-10 flex justify-between items-end mt-4 pt-4 border-t border-white/5 text-xs text-gray-400">
-              <span className="font-medium text-gray-300">Monthly target: ${dashboardStats.monthlyTarget.toLocaleString()}</span>
-              <span>Balance to target: ${(dashboardStats.monthlyTarget - dashboardStats.monthlyCollected).toLocaleString()}</span>
-            </div>
-          </div>
+          <RevenueCard
+            title={`Monthly Revenue - ${format(currentTime, 'MMM yyyy')}`}
+            value={dashboardStats.monthlyCollected}
+            thresholds={monthlyThresholds}
+            period="monthly"
+          />
 
           {/* Card 2: Daily Revenue */}
-          <div className="group relative flex flex-col justify-between rounded-2xl bg-gray-900/40 border border-white/5 p-6 shadow-xl transition-all duration-500 hover:bg-gray-800/50 overflow-hidden">
-            <div className="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-amber-500/10 blur-2xl group-hover:bg-amber-500/20 transition-all duration-500"></div>
-            <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-red-500/5 blur-2xl"></div>
-
-            <div className="relative z-10">
-              <p className="text-gray-300 text-sm font-medium mb-4 flex items-center">
-                <span className="w-2 h-2 rounded-full bg-amber-500 mr-2 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></span>
-                Total Daily revenue collected- {format(currentTime, 'MMM dd')} - 
-                <span className="text-white font-bold ml-1">${dashboardStats.dailyCollected.toLocaleString()}</span>
-              </p>
-              
-              <BarWithLabels label="Daily Sales" value={dashboardStats.dailyCollected} max={dashboardStats.dailyTarget} showLabels={true} />
-              <BarWithLabels label="Balance to target:" value={Math.max(0, dashboardStats.dailyTarget - dashboardStats.dailyCollected)} max={dashboardStats.dailyTarget} />
-            </div>
-            
-            <div className="relative z-10 flex justify-between items-end mt-4 pt-4 border-t border-white/5 text-xs text-gray-400">
-              <span className="font-medium text-gray-300">Daily target: ${dashboardStats.dailyTarget.toLocaleString()}</span>
-              <span>Balance to target: ${(dashboardStats.dailyTarget - dashboardStats.dailyCollected).toLocaleString()}</span>
-            </div>
-          </div>
+          <RevenueCard
+            title={`Daily Revenue - ${format(currentTime, 'MMM dd')}`}
+            value={dashboardStats.dailyCollected}
+            thresholds={dailyThresholds}
+            period="daily"
+          />
 
           {/* Card 3: Jobs Status */}
           <div className="group relative flex flex-col justify-between rounded-2xl bg-gray-900/40 border border-white/5 p-6 shadow-xl transition-all duration-500 hover:bg-gray-800/50 overflow-hidden">

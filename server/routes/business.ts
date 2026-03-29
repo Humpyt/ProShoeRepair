@@ -793,7 +793,7 @@ router.get('/commissions/trends', async (req, res) => {
       trends.push({
         month: `${year}-${String(month).padStart(2, '0')}`,
         year,
-        month,
+        monthNum: month,
         totalCommissions: archives.total_commissions,
         staffCount: archives.staff_count,
         topPerformer: topPerformer ? {

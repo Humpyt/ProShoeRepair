@@ -574,14 +574,14 @@ router.get('/daily-balance', async (req, res) => {
     const startOfDay = `${targetDate} 00:00:00`;
     const endOfDay = `${targetDate} 23:59:59`;
 
-    // Get sales breakdown by payment method
+    // Get sales breakdown by payment method from operation_payments
     const salesResult = await db.prepare(`
       SELECT
-        COALESCE(payment_method, 'Cash') as paymentMethod,
-        COALESCE(SUM(total_amount), 0) as total
-      FROM operations
-      WHERE created_at >= ? AND created_at <= ?
-      GROUP BY payment_method
+        COALESCE(op.payment_method, 'Cash') as paymentMethod,
+        COALESCE(SUM(op.amount), 0) as total
+      FROM operation_payments op
+      WHERE op.created_at >= ? AND op.created_at <= ?
+      GROUP BY op.payment_method
     `).all(startOfDay, endOfDay) as any[];
 
     // Get expenses breakdown by payment method
