@@ -276,74 +276,77 @@ export default function OperationPage() {
       </div>
 
       {activeTab === 'expenses' && (
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden mb-6">
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-200">All Expenses</h3>
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {expenses.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Receipt className="text-gray-500 mb-2" size={32} />
-                <p className="text-gray-400 text-sm">No expenses recorded yet</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-700">
-                {expenses.map((exp) => (
-                  <div
+        <div className="card-bevel overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-800">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Date</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Title</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Category</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Staff</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Vendor</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Payment</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {expenses.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    No expenses recorded yet
+                  </td>
+                </tr>
+              ) : (
+                expenses.map((exp, index) => (
+                  <tr
                     key={exp.id}
-                    className="p-4 hover:bg-gray-750/50 transition-colors group"
+                    className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-300">{format(new Date(exp.date), 'MMM d, yyyy')}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm font-medium text-white">{exp.title}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center ${
                           exp.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
                           exp.status === 'overdue' ? 'bg-rose-500/10 text-rose-400' :
                           'bg-amber-500/10 text-amber-400'
                         }`}>
                           {getCategoryIcon(exp.category)}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-white">{exp.title}</p>
-                          <p className="text-xs text-gray-500 mt-0.5">{exp.category}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-gray-500">
-                              {format(new Date(exp.date), 'MMM d, yyyy')}
-                            </span>
-                            <span className="text-gray-600">•</span>
-                            <span className="text-[10px] text-gray-500">
-                              by {exp.createdByName || 'Unknown'}
-                            </span>
-                            {exp.vendor && (
-                              <>
-                                <span className="text-gray-600">•</span>
-                                <span className="text-[10px] text-gray-500">{exp.vendor}</span>
-                              </>
-                            )}
-                          </div>
-                          {exp.notes && (
-                            <p className="text-[10px] text-gray-500 mt-1 truncate max-w-xs">{exp.notes}</p>
-                          )}
-                        </div>
+                        <span className="text-sm text-gray-300">{exp.category.split('&')[0].trim()}</span>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <p className="text-sm font-semibold text-white">{formatCurrency(exp.amount)}</p>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          exp.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
-                          exp.status === 'overdue' ? 'bg-rose-100 text-rose-800' :
-                          'bg-amber-100 text-amber-800'
-                        }`}>
-                          {exp.status}
-                        </span>
-                        {exp.paymentMethod && (
-                          <span className="text-[10px] text-gray-500">{exp.paymentMethod}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-300">{exp.createdByName || 'Unknown'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-400">{exp.vendor || '-'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-sm font-semibold text-white">{formatCurrency(exp.amount)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        exp.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                        exp.status === 'overdue' ? 'bg-rose-100 text-rose-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                        {exp.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs text-gray-500">{exp.paymentMethod || '-'}</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -414,6 +417,7 @@ export default function OperationPage() {
       )}
 
       {/* Work Table */}
+      {activeTab === 'operations' && (
       <div className="card-bevel overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-800">
@@ -572,6 +576,7 @@ export default function OperationPage() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
