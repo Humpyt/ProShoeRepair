@@ -72,13 +72,14 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo(
     () => ({
       customers,
+      fetchCustomers,
       addCustomer,
       updateCustomer,
       deleteCustomer,
       loading,
       error,
     }),
-    [customers, loading, error]
+    [customers, loading, error, fetchCustomers]
   );
 
   return (

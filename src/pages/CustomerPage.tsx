@@ -39,13 +39,14 @@ interface CustomerEvaluation {
 }
 
 export default function CustomerPage() {
-  const { 
-    customers, 
-    addCustomer, 
-    updateCustomer, 
+  const {
+    customers,
+    fetchCustomers,
+    addCustomer,
+    updateCustomer,
     deleteCustomer,
     loading,
-    error 
+    error
   } = useCustomer();
   const { operations } = useOperation();
   const [searchTerm, setSearchTerm] = useState('');
@@ -457,6 +458,9 @@ export default function CustomerPage() {
           );
         setUnpaidOperations(unpaid);
       }
+
+      // Refresh customer list to update totalSpent, totalOrders, accountBalance
+      await fetchCustomers();
 
       setIsPaymentModalOpen(false);
       setSelectedOperationForPayment(null);
