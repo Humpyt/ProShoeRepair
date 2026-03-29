@@ -224,7 +224,7 @@ export default function PickupPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        {ticket.status !== 'completed' && (ticket.total - ticket.paidAmount) <= 0 ? (
+                        {ticket.status !== 'completed' ? (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -232,7 +232,7 @@ export default function PickupPage() {
                             }}
                             className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition-colors"
                           >
-                            Picked Up
+                            Taken
                           </button>
                         ) : (
                           <span className="text-xs text-gray-500">-</span>
@@ -365,13 +365,13 @@ export default function PickupPage() {
                     </div>
                   )}
 
-                  {selectedBalance === 0 && selected.status !== 'completed' && (
+                  {selected.status !== 'completed' && (
                     <button
                       onClick={() => handleMarkPickedUp(selected.id)}
                       className="w-full flex items-center justify-center gap-2 p-4 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white font-medium transition-colors"
                     >
                       <CheckSquare size={20} />
-                      <span>Mark as Picked Up</span>
+                      <span>Mark as Taken</span>
                     </button>
                   )}
                 </div>
