@@ -100,7 +100,6 @@ const menuGroups = [
     title: "Management",
     items: [
       { icon: Settings, label: "Operation", to: "/operation", permission: "view_operations" },
-      { icon: Wallet, label: "Expenses", to: "/expenses" },
       { icon: ShoppingBag, label: "Sales", to: "/sales", permission: "view_sales" },
       { icon: QrCode, label: "QR Codes", to: "/qrcodes", permission: "view_qrcodes" },
     ]
