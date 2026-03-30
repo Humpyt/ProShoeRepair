@@ -1,7 +1,6 @@
 import axios from 'axios';
-import { API_ENDPOINTS } from '../config/api';
 
-const API_URL = API_ENDPOINTS.products;
+const API_URL = 'http://localhost:3000/api';
 
 export interface Category {
   id: string;

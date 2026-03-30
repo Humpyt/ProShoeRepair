@@ -1,47 +1,27 @@
-// API base URL - set via environment variable for production
-// For local development, defaults to localhost:3000
-// For production on Netlify, set VITE_API_URL to your VPS address (e.g., http://69.62.125.228:3000)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = 'http://localhost:3000/api';
 
 export const API_ENDPOINTS = {
-  // Auth
-  login: `${API_BASE_URL}/api/auth/login`,
-  me: `${API_BASE_URL}/api/auth/me`,
-  register: `${API_BASE_URL}/api/auth/register`,
-  users: `${API_BASE_URL}/api/auth/users`,
-
-  // Operations
-  operations: `${API_BASE_URL}/api/operations`,
-
-  // Customers
-  customers: `${API_BASE_URL}/api/customers`,
-
-  // Services
-  services: `${API_BASE_URL}/api/services`,
-
-  // Staff Messages
-  staffMessages: `${API_BASE_URL}/api/staff-messages`,
-  staffMessageUsers: `${API_BASE_URL}/api/staff-messages/users`,
-  staffMessageConversations: `${API_BASE_URL}/api/staff-messages/conversations`,
-  staffMessageUnreadCount: `${API_BASE_URL}/api/staff-messages/unread-count`,
-
-  // Retail Products
-  retailProducts: `${API_BASE_URL}/api/retail-products`,
-
-  // Business/Targets
-  businessTargets: `${API_BASE_URL}/api/business/targets`,
-
-  // Invoices
-  invoices: `${API_BASE_URL}/api/invoices`,
-
-  // Sales
-  sales: `${API_BASE_URL}/api/sales`,
-
-  // QR Codes
-  qrcodes: `${API_BASE_URL}/api/qrcodes`,
-
-  // Analytics
-  analytics: `${API_BASE_URL}/api/analytics`,
+  operations: `${API_URL}/operations`,
+  inventory: `${API_URL}/inventory`,
+  printer: `${API_URL}/printer`,
+  sales: `${API_URL}/sales`,
+  qrcodes: `${API_URL}/qrcodes`,
+  supplies: `${API_URL}/supplies`,
+  categories: `${API_URL}/categories`,
+  products: `${API_URL}/products`,
+  customers: `${API_URL}/customers`,
+  business: `${API_URL}/business`,
+  auth: `${API_URL}/auth`,
+  'staff-messages': `${API_URL}/staff-messages`,
+  colors: `${API_URL}/colors`,
+  invoices: `${API_URL}/invoices`,
+  analytics: `${API_URL}/analytics`,
+  'retail-products': `${API_URL}/retail-products`,
+  expenses: `${API_URL}/expenses`,
+  'auth/users': `${API_URL}/auth/users`,
+  'auth/register': `${API_URL}/auth/register`,
+  'business/targets/staff/all': `${API_URL}/business/targets/staff/all`,
+  'business/targets/staff': `${API_URL}/business/targets/staff`,
+  'business/targets/summary': `${API_URL}/business/targets/summary`,
+  'analytics/new-customers': `${API_URL}/analytics/new-customers`,
 };
-
-export default API_BASE_URL;

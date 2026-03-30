@@ -48,10 +48,10 @@ export function Staff() {
 
         // Fetch users and their performance data
         const [usersResponse, performanceResponse] = await Promise.all([
-          fetch(API_ENDPOINTS.auth/users, {
+          fetch(API_ENDPOINTS['auth/users'], {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
-          fetch(API_ENDPOINTS.business/targets/staff/all, {
+          fetch(API_ENDPOINTS['business/targets/staff/all'], {
             headers: { 'Authorization': `Bearer ${token}` }
           })
         ]);
@@ -100,7 +100,7 @@ export function Staff() {
       }
 
       // Register new staff member via API
-      const response = await fetch(API_ENDPOINTS.auth/register, {
+      const response = await fetch(API_ENDPOINTS['auth/register'], {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

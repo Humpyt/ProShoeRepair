@@ -113,7 +113,7 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(API_ENDPOINTS.auth/users, {
+      const response = await fetch(API_ENDPOINTS['auth/users'], {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -141,7 +141,7 @@ const UserManagement: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(API_ENDPOINTS.auth/register, {
+      const response = await fetch(API_ENDPOINTS['auth/register'], {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ const UserManagement: React.FC = () => {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_ENDPOINTS.auth/users}/${userId}`, {
+      const response = await fetch(`${API_ENDPOINTS['auth/users']}/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -457,7 +457,7 @@ const StaffTargetsManagement: React.FC = () => {
   const fetchStaffTargets = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(API_ENDPOINTS.business/targets/staff/all, {
+      const response = await fetch(API_ENDPOINTS['business/targets/staff/all'], {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -478,7 +478,7 @@ const StaffTargetsManagement: React.FC = () => {
   const updateStaffTarget = async (userId: string, targetType: 'daily' | 'monthly', value: number) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_ENDPOINTS.business/targets/staff}/${userId}/targets`, {
+      const response = await fetch(`${API_ENDPOINTS['business/targets/staff']}/${userId}/targets`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

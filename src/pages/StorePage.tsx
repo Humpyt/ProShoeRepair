@@ -60,7 +60,7 @@ export default function StorePage() {
 
         // Fetch operations (filtered by staff if needed)
         const operationsUrl = canSeeAllData
-          ? API_ENDPOINTS.operations
+          ? `${API_ENDPOINTS.operations}`
           : `${API_ENDPOINTS.operations}?created_by=${user?.id}`;
         const opsResponse = await fetch(operationsUrl);
         const operations = await opsResponse.json();

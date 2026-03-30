@@ -25,7 +25,7 @@ export function StaffTargetModal({ isOpen, onClose, onSave, staff, dailyTarget }
     if (staff) {
       try {
         const token = localStorage.getItem('auth_token');
-        await fetch(`${API_ENDPOINTS.business/targets/staff}/${staff.id}/targets`, {
+        await fetch(`${API_ENDPOINTS['business/targets/staff']}/${staff.id}/targets`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

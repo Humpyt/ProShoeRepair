@@ -49,7 +49,7 @@ export default function NewCustomersPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await fetch(API_ENDPOINTS.analytics/new-customers);
+        const res = await fetch(API_ENDPOINTS['analytics/new-customers']);
         if (!res.ok) {
           throw new Error('Failed to fetch new customers data');
         }

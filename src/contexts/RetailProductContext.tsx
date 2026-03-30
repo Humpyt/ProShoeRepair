@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
-import { API_ENDPOINTS } from '../config/api';
+
+const API_BASE = 'http://localhost:3000/api/retail-products';
 
 export interface RetailProduct {
   id: string;
@@ -40,8 +41,8 @@ export const RetailProductProvider: React.FC<{ children: React.ReactNode }> = ({
       setError(null);
 
       const [productsRes, categoriesRes] = await Promise.all([
-        fetch(`${API_ENDPOINTS.retailProducts}`),
-        fetch(`${API_ENDPOINTS.retailProducts}/categories`),
+        fetch(`${API_BASE}`),
+        fetch(`${API_BASE}/categories`),
       ]);
 
       if (!productsRes.ok) {
@@ -70,7 +71,7 @@ export const RetailProductProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const createProduct = async (product: Omit<RetailProduct, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.retailProducts}`, {
+      const response = await fetch(`${API_BASE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,7 +94,7 @@ export const RetailProductProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateProduct = async (id: string, productUpdate: Partial<RetailProduct>) => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.retailProducts}/${id}`, {
+      const response = await fetch(`${API_BASE}/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ export const RetailProductProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteProduct = async (id: string) => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.retailProducts}/${id}`, {
+      const response = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE',
       });
 

@@ -183,9 +183,6 @@ npm run cleanup:services         # Remove duplicate services from database
 
 11. **Deployment:** Configured for Netlify (see `netlify.toml`) and PM2 for VPS deployment. The Express backend requires a separate Node.js hosting - it won't work on Netlify's serverless functions.
 
-**Environment Variables for Production:**
-- `VITE_API_URL` - Backend API URL (e.g., `http://69.62.125.228:3000`). Defaults to `http://localhost:3000` for local development.
-
 12. **TypeScript:** Uses project references (tsconfig.app.json, tsconfig.node.json) for better type checking across frontend and backend.
 
 ## Database Schema Relationships

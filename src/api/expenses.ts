@@ -6,9 +6,8 @@ import {
   ExpenseFilters
 } from '../types/expense';
 import { getAuthToken } from '../store/authStore';
-import { API_ENDPOINTS } from '../config/api';
 
-const API_BASE = API_ENDPOINTS.analytics;
+const API_BASE = 'http://localhost:3000/api';
 
 const getHeaders = () => {
   const token = getAuthToken();

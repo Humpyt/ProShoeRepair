@@ -1,7 +1,6 @@
 import { Customer, Order, Service } from '../types';
-import { API_ENDPOINTS } from '../config/api';
 
-const API_URL = API_ENDPOINTS.customers;
+const API_URL = 'http://localhost:3000/api';
 
 export const api = {
   // Customer endpoints
