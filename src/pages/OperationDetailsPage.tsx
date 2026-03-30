@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Package, Clock, DollarSign, User, CheckCircle, Wrench, Truck, Home } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -33,7 +34,7 @@ export default function OperationDetailsPage() {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const response = await fetch(`http://localhost:3000/api/operations/${id}`, { headers });
+        const response = await fetch(`${API_ENDPOINTS.operations}/${id}`, { headers });
         if (response.ok) {
           const data = await response.json();
           setOperation(data);
@@ -57,7 +58,7 @@ export default function OperationDetailsPage() {
     const fetchPayments = async () => {
       if (id) {
         try {
-          const response = await fetch(`http://localhost:3000/api/operations/${id}/payments`);
+          const response = await fetch(`${API_ENDPOINTS.operations}/${id}/payments`);
           if (response.ok) {
             const paymentsData = await response.json();
             setPayments(paymentsData);

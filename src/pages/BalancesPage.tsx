@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { Printer, User, Phone, DollarSign, Calendar, Search, Filter, ChevronDown } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useOperation } from '../contexts/OperationContext';
@@ -365,7 +366,7 @@ export default function BalancesPage() {
             if (!selectedBalance) return;
             try {
               const token = localStorage.getItem('auth_token');
-              const response = await fetch(`http://localhost:3000/api/operations/${selectedBalance.id}/payments`, {
+              const response = await fetch(`${API_ENDPOINTS.operations}/${selectedBalance.id}/payments`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',

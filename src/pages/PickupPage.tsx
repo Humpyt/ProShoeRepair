@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useOperation } from '../contexts/OperationContext';
 import { PaymentModal } from '../components/PaymentModal';
@@ -104,7 +105,7 @@ export default function PickupPage() {
     try {
       if (!selectedTicket) return;
 
-      const response = await fetch(`http://localhost:3000/api/operations/${selectedTicket}/payments`, {
+      const response = await fetch(`${API_ENDPOINTS.operations}/${selectedTicket}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payments }),

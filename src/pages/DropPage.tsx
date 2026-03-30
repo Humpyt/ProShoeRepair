@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { X, Plus, User, Search, Star, Percent, Phone, Mail, Palette, Scissors, Settings, Edit2, Trash2, FolderOpen, CheckCircle, DollarSign, CreditCard, Calendar, Clock, Package, Printer, ShoppingBag } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import toast from 'react-hot-toast';
@@ -395,7 +396,7 @@ export default function DropPage() {
 
       // The CustomerContext.addCustomer will return the created customer with the DB-generated ID
       // But we need to work around the current API structure
-      const response = await fetch('http://localhost:3000/api/customers', {
+      const response = await fetch(API_ENDPOINTS.customers, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerToSave),
@@ -410,7 +411,7 @@ export default function DropPage() {
       setIsCustomerModalOpen(false);
 
       // Refresh the customer list
-      fetch('http://localhost:3000/api/customers')
+      fetch(API_ENDPOINTS.customers)
         .then(r => r.json())
         .then(data => {
           // Update context by re-fetching
@@ -881,7 +882,7 @@ export default function DropPage() {
       const operation = await addOperation(operationData);
 
       // Process payments
-      const response = await fetch(`http://localhost:3000/api/operations/${operation.id}/payments`, {
+      const response = await fetch(`${API_ENDPOINTS.operations}/${operation.id}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payments }),
@@ -906,7 +907,7 @@ export default function DropPage() {
       // If store credit was used, deduct from customer account
       const storeCreditPayment = payments.find(p => p.method === 'store_credit');
       if (storeCreditPayment && selectedCustomer) {
-        await fetch(`http://localhost:3000/api/customers/${selectedCustomer.id}/credits/deduct`, {
+        await fetch(`${API_ENDPOINTS.customers}/${selectedCustomer.id}/credits/deduct`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2253,7 +2254,7 @@ export default function DropPage() {
                     if (createdOperationId) {
                       try {
                         // First create the invoice/receipt
-                        const invoiceRes = await fetch('http://localhost:3000/api/invoices', {
+                        const invoiceRes = await fetch(API_ENDPOINTS.invoices, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
@@ -2285,7 +2286,7 @@ export default function DropPage() {
 
                         // Now print with the invoice ID
                         if (invoiceId) {
-                          const printRes = await fetch(`http://localhost:3000/api/invoices/${invoiceId}/print`, {
+                          const printRes = await fetch(`${API_ENDPOINTS.invoices}/${invoiceId}/print`, {
                             method: 'POST'
                           });
                           const printData = await printRes.json();

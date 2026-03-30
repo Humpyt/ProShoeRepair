@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authFetch } from '../store/authStore';
+import { API_ENDPOINTS } from '../config/api';
 
 interface StaffUser {
   id: string;
@@ -54,7 +55,7 @@ export function StaffMessageProvider({ children }: { children: React.ReactNode }
   // Fetch all users for composing new messages
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await authFetch('http://localhost:3000/api/staff-messages/users');
+      const response = await authFetch(API_ENDPOINTS.staffMessageUsers);
       if (response.ok) {
         const data = await response.json();
         setAllUsers(data);
@@ -67,7 +68,7 @@ export function StaffMessageProvider({ children }: { children: React.ReactNode }
   // Fetch conversations
   const refreshConversations = useCallback(async () => {
     try {
-      const response = await authFetch('http://localhost:3000/api/staff-messages/conversations');
+      const response = await authFetch(API_ENDPOINTS.staffMessageConversations);
       if (response.ok) {
         const data = await response.json();
         setConversations(data);
@@ -80,7 +81,7 @@ export function StaffMessageProvider({ children }: { children: React.ReactNode }
   // Fetch unread count
   const refreshUnreadCount = useCallback(async () => {
     try {
-      const response = await authFetch('http://localhost:3000/api/staff-messages/unread-count');
+      const response = await authFetch(API_ENDPOINTS.staffMessageUnreadCount);
       if (response.ok) {
         const data = await response.json();
         setUnreadCount(data.count);
@@ -93,7 +94,7 @@ export function StaffMessageProvider({ children }: { children: React.ReactNode }
   // Fetch messages for active conversation
   const fetchMessages = useCallback(async (conversationId: string) => {
     try {
-      const response = await authFetch(`http://localhost:3000/api/staff-messages/conversations/${conversationId}`);
+      const response = await authFetch(`${API_ENDPOINTS.staffMessageConversations}/${conversationId}`);
       if (response.ok) {
         const data = await response.json();
         setActiveMessages(data);
@@ -136,7 +137,7 @@ export function StaffMessageProvider({ children }: { children: React.ReactNode }
     if (!activeConversation) return;
 
     try {
-      const response = await authFetch('http://localhost:3000/api/staff-messages', {
+      const response = await authFetch(API_ENDPOINTS.staffMessages, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -160,7 +161,7 @@ export function StaffMessageProvider({ children }: { children: React.ReactNode }
   // Start new conversation
   const startConversation = useCallback(async (userId: string) => {
     try {
-      const response = await authFetch('http://localhost:3000/api/staff-messages/conversations', {
+      const response = await authFetch(API_ENDPOINTS.staffMessageConversations, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipientId: userId }),

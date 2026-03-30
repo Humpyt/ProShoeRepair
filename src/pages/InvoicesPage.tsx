@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { Receipt, Search, Calendar, X, Printer, Eye, FileText } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import axios from 'axios';
@@ -60,7 +61,7 @@ export default function InvoicesPage() {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
 
-      const response = await axios.get(`http://localhost:3000/api/invoices?${params}`);
+      const response = await axios.get(`${API_ENDPOINTS.invoices}?${params}`);
       setInvoices(response.data);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);
@@ -75,7 +76,7 @@ export default function InvoicesPage() {
 
   const handleViewInvoice = async (id: string) => {
     try {
-      const response = await axios.get(`http://localhost:3000/api/invoices/${id}`);
+      const response = await axios.get(`${API_ENDPOINTS.invoices}/${id}`);
       setSelectedInvoice(response.data);
       setShowDetailModal(true);
     } catch (error) {
@@ -87,7 +88,7 @@ export default function InvoicesPage() {
   const handlePrintInvoice = async (id: string) => {
     setPrinting(true);
     try {
-      const response = await axios.post(`http://localhost:3000/api/invoices/${id}/print`);
+      const response = await axios.post(`${API_ENDPOINTS.invoices}/${id}/print`);
       if (response.data.success) {
         toast.success(response.data.simulated ? 'Print simulated (no printer)' : 'Print sent to printer');
       } else {

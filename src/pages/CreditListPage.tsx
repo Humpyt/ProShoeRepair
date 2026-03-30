@@ -23,7 +23,7 @@ interface CreditTransaction {
   created_at: string;
 }
 
-const API_URL = 'http://localhost:3000/api';
+const API_URL = '/api';
 
 export default function CreditListPage() {
   const { user } = useAuthStore();

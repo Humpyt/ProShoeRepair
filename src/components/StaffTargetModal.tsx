@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { X, Target, TrendingUp } from 'lucide-react';
 import type { Staff } from '../types';
 
@@ -24,7 +25,7 @@ export function StaffTargetModal({ isOpen, onClose, onSave, staff, dailyTarget }
     if (staff) {
       try {
         const token = localStorage.getItem('auth_token');
-        await fetch(`http://localhost:3000/api/business/targets/staff/${staff.id}/targets`, {
+        await fetch(`${API_ENDPOINTS.business/targets/staff}/${staff.id}/targets`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',

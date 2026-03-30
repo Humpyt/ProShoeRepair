@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import {
   Search, Plus, Filter, Download, Phone, Mail,
   MapPin, Package, DollarSign, Calendar, Star,
@@ -242,7 +243,7 @@ export default function CustomerPage() {
     const fetchCreditTransactions = async () => {
       if (selectedCustomer) {
         try {
-          const response = await fetch(`http://localhost:3000/api/customers/${selectedCustomer.id}/credits`);
+          const response = await fetch(`${API_ENDPOINTS.customers}/${selectedCustomer.id}/credits`);
           if (response.ok) {
             const credits = await response.json();
             setCreditTransactions(credits);
@@ -303,7 +304,7 @@ export default function CustomerPage() {
       if (selectedCustomer) {
         try {
           // Fetch all operations
-          const response = await fetch('http://localhost:3000/api/operations');
+          const response = await fetch(API_ENDPOINTS.operations);
           if (response.ok) {
             const allOps = await response.json();
             // Filter for this customer's unpaid operations
@@ -433,7 +434,7 @@ export default function CustomerPage() {
     if (!selectedOperationForPayment || !selectedCustomer) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/operations/${selectedOperationForPayment.id}/payments`, {
+      const response = await fetch(`${API_ENDPOINTS.operations}/${selectedOperationForPayment.id}/payments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payments }),
@@ -445,7 +446,7 @@ export default function CustomerPage() {
       }
 
       // Refresh unpaid operations
-      const unpaidResponse = await fetch('http://localhost:3000/api/operations');
+      const unpaidResponse = await fetch(API_ENDPOINTS.operations);
       if (unpaidResponse.ok) {
         const allOps = await unpaidResponse.json();
         const unpaid = allOps
@@ -1006,7 +1007,7 @@ export default function CustomerPage() {
         customer={selectedCustomer}
         outstandingBalance={unpaidOperations.reduce((sum, op) => sum + (op.totalAmount - (op.paidAmount || 0)), 0)}
         onAddCredit={async (amount, description) => {
-          const response = await fetch(`http://localhost:3000/api/customers/${selectedCustomer?.id}/credits`, {
+          const response = await fetch(`${API_ENDPOINTS.customers}/${selectedCustomer?.id}/credits`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1023,7 +1024,7 @@ export default function CustomerPage() {
 
           // Auto-apply credit to outstanding debts
           try {
-            const autoPayResponse = await fetch(`http://localhost:3000/api/customers/${selectedCustomer?.id}/apply-credit-to-debts`, {
+            const autoPayResponse = await fetch(`${API_ENDPOINTS.customers}/${selectedCustomer?.id}/apply-credit-to-debts`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' }
             });

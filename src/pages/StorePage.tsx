@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { format, startOfMonth } from 'date-fns';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate } from 'react-router-dom';
@@ -59,8 +60,8 @@ export default function StorePage() {
 
         // Fetch operations (filtered by staff if needed)
         const operationsUrl = canSeeAllData
-          ? 'http://localhost:3000/api/operations'
-          : `http://localhost:3000/api/operations?created_by=${user?.id}`;
+          ? API_ENDPOINTS.operations
+          : `${API_ENDPOINTS.operations}?created_by=${user?.id}`;
         const opsResponse = await fetch(operationsUrl);
         const operations = await opsResponse.json();
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import {
   Table,
   TableBody,
@@ -47,7 +48,7 @@ export default function SalesPage() {
       setLoading(true);
       setError(null);
       
-      let url = 'http://localhost:3000/api/sales';
+      let url = API_ENDPOINTS.sales;
       const params = new URLSearchParams();
       
       if (startDate) {

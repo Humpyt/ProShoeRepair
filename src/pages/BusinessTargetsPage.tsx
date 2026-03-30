@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { Target, TrendingUp, TrendingDown, Calendar, BarChart3, Activity, Users, Trophy, Award, Zap } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useAuthStore } from '../store/authStore';
@@ -407,8 +408,8 @@ const BusinessTargetsPage: React.FC = () => {
         if (user?.role === 'admin' || user?.role === 'manager') {
           // Admin/Manager: Fetch business summary, all staff performance, and personal daily data
           const [summaryRes, allStaffRes] = await Promise.all([
-            fetch('http://localhost:3000/api/business/targets/summary'),
-            fetch('http://localhost:3000/api/business/targets/staff/all', {
+            fetch(API_ENDPOINTS.business/targets/summary),
+            fetch(API_ENDPOINTS.business/targets/staff/all, {
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
               }
@@ -428,7 +429,7 @@ const BusinessTargetsPage: React.FC = () => {
           setAllStaffPerformance(allStaff);
         } else {
           // Staff: Fetch only personal performance data
-          const staffRes = await fetch(`http://localhost:3000/api/business/targets/staff/${user?.id}`, {
+          const staffRes = await fetch(`${API_ENDPOINTS.business/targets/staff}/${user?.id}`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
             }

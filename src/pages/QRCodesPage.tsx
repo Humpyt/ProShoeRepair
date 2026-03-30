@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { QrCode, Plus, Search, Tag, Package, Download, Trash2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import axios from 'axios';
@@ -33,7 +34,7 @@ export default function QRCodesPage() {
   useEffect(() => {
     const fetchQRCodes = async () => {
       try {
-        const response = await axios.get('http://localhost:3000/api/qrcodes');
+        const response = await axios.get(API_ENDPOINTS.qrcodes);
         setQrCodes(response.data);
       } catch (error) {
         console.error('Error fetching QR codes:', error);
@@ -96,7 +97,7 @@ export default function QRCodesPage() {
             sku: formData.sku
           };
 
-      const response = await axios.post('http://localhost:3000/api/qrcodes', {
+      const response = await axios.post(API_ENDPOINTS.qrcodes, {
         type: selectedType,
         data: JSON.stringify(data),
         label: selectedType === 'drop' 
@@ -116,7 +117,7 @@ export default function QRCodesPage() {
 
   const handleDeleteQR = async (id: string) => {
     try {
-      await axios.delete(`http://localhost:3000/api/qrcodes/${id}`);
+      await axios.delete(`${API_ENDPOINTS.qrcodes}/${id}`);
       setQrCodes(qrCodes.filter(code => code.id !== id));
       toast.success('QR code deleted successfully');
     } catch (error) {

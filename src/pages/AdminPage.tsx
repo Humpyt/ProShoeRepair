@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { Users, Shield, Settings, FileText, ChevronRight, Plus, Edit2, Trash2, X, Target } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -112,7 +113,7 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('http://localhost:3000/api/auth/users', {
+      const response = await fetch(API_ENDPOINTS.auth/users, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -140,7 +141,7 @@ const UserManagement: React.FC = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch(API_ENDPOINTS.auth/register, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,7 +180,7 @@ const UserManagement: React.FC = () => {
 
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`http://localhost:3000/api/auth/users/${userId}`, {
+      const response = await fetch(`${API_ENDPOINTS.auth/users}/${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -456,7 +457,7 @@ const StaffTargetsManagement: React.FC = () => {
   const fetchStaffTargets = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('http://localhost:3000/api/business/targets/staff/all', {
+      const response = await fetch(API_ENDPOINTS.business/targets/staff/all, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -477,7 +478,7 @@ const StaffTargetsManagement: React.FC = () => {
   const updateStaffTarget = async (userId: string, targetType: 'daily' | 'monthly', value: number) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`http://localhost:3000/api/business/targets/staff/${userId}/targets`, {
+      const response = await fetch(`${API_ENDPOINTS.business/targets/staff}/${userId}/targets`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

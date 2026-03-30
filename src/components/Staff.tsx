@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { useNavigate } from 'react-router-dom';
 import { Users, PlusCircle, Briefcase, Mail, Target, TrendingUp, AlertCircle, LayoutGrid, LayoutList, Loader2, Trophy } from 'lucide-react';
 import type { Staff } from '../types';
@@ -47,10 +48,10 @@ export function Staff() {
 
         // Fetch users and their performance data
         const [usersResponse, performanceResponse] = await Promise.all([
-          fetch('http://localhost:3000/api/auth/users', {
+          fetch(API_ENDPOINTS.auth/users, {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
-          fetch('http://localhost:3000/api/business/targets/staff/all', {
+          fetch(API_ENDPOINTS.business/targets/staff/all, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
         ]);
@@ -99,7 +100,7 @@ export function Staff() {
       }
 
       // Register new staff member via API
-      const response = await fetch('http://localhost:3000/api/auth/register', {
+      const response = await fetch(API_ENDPOINTS.auth/register, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

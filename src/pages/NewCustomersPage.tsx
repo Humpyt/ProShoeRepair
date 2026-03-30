@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 import { Users, TrendingUp, Calendar, UserPlus, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -48,7 +49,7 @@ export default function NewCustomersPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await fetch('http://localhost:3000/api/analytics/new-customers');
+        const res = await fetch(API_ENDPOINTS.analytics/new-customers);
         if (!res.ok) {
           throw new Error('Failed to fetch new customers data');
         }
