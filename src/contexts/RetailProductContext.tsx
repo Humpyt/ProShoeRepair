@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 
-const API_BASE = 'http://localhost:3000/api/retail-products';
+const API_BASE = '/api/retail-products';
 
 export interface RetailProduct {
   id: string;

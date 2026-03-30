@@ -60,7 +60,7 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const response = await fetch('http://localhost:3000/api/operations', { headers });
+        const response = await fetch('/api/operations', { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch operations');
         }
@@ -89,7 +89,7 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const response = await fetch('http://localhost:3000/api/operations', {
+      const response = await fetch('/api/operations', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -125,7 +125,7 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch(`http://localhost:3000/api/operations/${id}`, {
+      const response = await fetch(`/api/operations/${id}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify({ ...updates, updatedAt: new Date().toISOString() }),
@@ -150,7 +150,7 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch(`http://localhost:3000/api/operations/${id}`, {
+      const response = await fetch(`/api/operations/${id}`, {
         method: 'DELETE',
         headers,
       });
@@ -177,7 +177,7 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch('http://localhost:3000/api/operations', { headers });
+      const response = await fetch('/api/operations', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch operations');
       }

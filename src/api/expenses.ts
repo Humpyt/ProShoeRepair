@@ -7,7 +7,7 @@ import {
 } from '../types/expense';
 import { getAuthToken } from '../store/authStore';
 
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = '/api';
 
 const getHeaders = () => {
   const token = getAuthToken();

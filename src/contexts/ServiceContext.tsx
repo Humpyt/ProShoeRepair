@@ -33,7 +33,7 @@ export const ServiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3000/api/services');
+      const response = await fetch('/api/services');
 
       if (!response.ok) {
         throw new Error('Failed to fetch services');
@@ -56,7 +56,7 @@ export const ServiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const addService = async (service: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const response = await fetch('http://localhost:3000/api/services', {
+      const response = await fetch('/api/services', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ export const ServiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const updateService = async (id: string, serviceUpdate: Partial<Service>) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/services/${id}`, {
+      const response = await fetch(`/api/services/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -106,7 +106,7 @@ export const ServiceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const deleteService = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/services/${id}`, {
+      const response = await fetch(`/api/services/${id}`, {
         method: 'DELETE',
       });
 
