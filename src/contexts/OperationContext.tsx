@@ -60,12 +60,12 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const response = await fetch('/api/operations', { headers });
+        const response = await fetch('/api/operations?limit=500', { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch operations');
         }
-        const data = await response.json();
-        setOperations(data);
+        const result = await response.json();
+        setOperations(result.data);
       } catch (error) {
         console.error('Error fetching operations:', error);
       }
@@ -177,12 +177,12 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const response = await fetch('/api/operations', { headers });
+      const response = await fetch('/api/operations?limit=500', { headers });
       if (!response.ok) {
         throw new Error('Failed to fetch operations');
       }
-      const data = await response.json();
-      setOperations(data);
+      const result = await response.json();
+      setOperations(result.data);
     } catch (error) {
       console.error('Error refreshing operations:', error);
       throw error;

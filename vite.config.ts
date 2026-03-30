@@ -18,26 +18,15 @@ export default defineConfig({
     port: 5173,
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Split vendor chunks
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'mui-vendor': ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
-          'charts': ['chart.js', 'react-chartjs-2', 'recharts'],
-          'ui-vendor': ['@fortawesome/fontawesome-svg-core', '@fortawesome/free-solid-svg-icons', '@fortawesome/react-fontawesome', 'lucide-react', 'clsx'],
-        },
-      },
-    },
     // Reduce chunk size warning limit
     chunkSizeWarningLimit: 600,
-    // Enable minification (esbuild is built-in, faster than terser)
+    // Enable minification
     minify: 'esbuild',
-    // Source maps for production debugging
+    // Disable source maps for production
     sourcemap: false,
   },
-  // Optimize deps
+  // Optimize deps to ensure proper bundling
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@mui/material', '@emotion/react', '@emotion/styled'],
+    include: ['react', 'react-dom', 'react-router-dom', '@mui/material', '@emotion/react', '@emotion/styled', 'clsx'],
   },
 });

@@ -41,8 +41,8 @@ const getRetailItemsByOperationIds = async (operationIds: string[]) => {
 // Get all operations
 router.get('/', async (req, res) => {
   try {
-    const { created_by, status, limit = 100, offset = 0 } = req.query;
-    const parsedLimit = Math.min(parseInt(limit as string) || 100, 500);
+    const { created_by, status, limit = 1000, offset = 0 } = req.query;
+    const parsedLimit = Math.min(parseInt(limit as string) || 1000, 5000);
     const parsedOffset = parseInt(offset as string) || 0;
 
     let query = `

@@ -60,7 +60,7 @@ app.use('/api/expenses', expensesRouter);
 // Customer endpoints
 app.get('/api/customers', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+    const limit = Math.min(parseInt(req.query.limit as string) || 5000, 10000);
     const offset = parseInt(req.query.offset as string) || 0;
     const search = req.query.search as string;
 

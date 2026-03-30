@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// Use relative URL so it inherits page protocol (http/https)
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const API_ENDPOINTS = {
   operations: `${API_URL}/operations`,
