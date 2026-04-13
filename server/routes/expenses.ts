@@ -82,45 +82,45 @@ router.get('/', authenticateToken, async (req: any, res: any) => {
 
     // Role-based filtering: staff can only see their own expenses
     if (req.user.role === 'staff') {
-      query += ' AND e.created_by = ?';
-      countQuery += ' AND e.created_by = ?';
+      query += ` AND e.created_by = $${params.length + 1}`;
+      countQuery += ` AND e.created_by = $${countParams.length + 1}`;
       params.push(req.user.id);
       countParams.push(req.user.id);
     }
 
     if (category) {
-      query += ' AND e.category = ?';
-      countQuery += ' AND e.category = ?';
+      query += ` AND e.category = $${params.length + 1}`;
+      countQuery += ` AND e.category = $${countParams.length + 1}`;
       params.push(category);
       countParams.push(category);
     }
 
     if (status) {
-      query += ' AND e.status = ?';
-      countQuery += ' AND e.status = ?';
+      query += ` AND e.status = $${params.length + 1}`;
+      countQuery += ` AND e.status = $${countParams.length + 1}`;
       params.push(status);
       countParams.push(status);
     }
 
     if (startDate) {
-      query += ' AND e.date >= ?';
-      countQuery += ' AND e.date >= ?';
+      query += ` AND e.date >= $${params.length + 1}`;
+      countQuery += ` AND e.date >= $${countParams.length + 1}`;
       params.push(startDate);
       countParams.push(startDate);
     }
 
     if (endDate) {
-      query += ' AND e.date <= ?';
-      countQuery += ' AND e.date <= ?';
+      query += ` AND e.date <= $${params.length + 1}`;
+      countQuery += ` AND e.date <= $${countParams.length + 1}`;
       params.push(endDate);
       countParams.push(endDate);
     }
 
-    query += ' ORDER BY e.date DESC, e.created_at DESC LIMIT ? OFFSET ?';
+    query += ` ORDER BY e.date DESC, e.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(parseInt(limit as string), parseInt(offset as string));
 
-    const expenses = await db.prepare(query).all(...params);
-    const countResult = await db.prepare(countQuery).get(...countParams);
+    const expenses = await db.all(query, params);
+    const countResult = await db.get(countQuery, countParams);
     const total = (countResult as any).total;
 
     res.json({
@@ -148,40 +148,40 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
     const userId = req.user.id;
 
     // Build WHERE clause for staff filtering
-    const staffWhere = isStaff ? ' AND created_by = ?' : '';
+    const staffWhere = isStaff ? ` AND created_by = $${isStaff ? 3 : 0}` : '';
     const staffParams = isStaff ? [userId] : [];
 
     // Total expenses this month
-    const monthlyTotalResult = await db.prepare(`
+    const monthlyTotalResult = await db.get(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM expenses
-      WHERE date >= ? AND date <= ?${staffWhere}
-    `).get(startOfMonth.toISOString().split('T')[0], endOfMonth.toISOString().split('T')[0], ...staffParams) as any;
+      WHERE date >= $1 AND date <= $2${staffWhere}
+    `, [startOfMonth.toISOString().split('T')[0], endOfMonth.toISOString().split('T')[0], ...staffParams]) as any;
 
     // Total expenses this week
-    const weeklyTotalResult = await db.prepare(`
+    const weeklyTotalResult = await db.get(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM expenses
-      WHERE date >= ?${staffWhere}
-    `).get(startOfWeek.toISOString().split('T')[0], ...staffParams) as any;
+      WHERE date >= $1${staffWhere}
+    `, [startOfWeek.toISOString().split('T')[0], ...staffParams]) as any;
 
     // Total expenses today
-    const todayTotalResult = await db.prepare(`
+    const todayTotalResult = await db.get(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM expenses
-      WHERE date = ?${staffWhere}
-    `).get(startOfToday.toISOString().split('T')[0], ...staffParams) as any;
+      WHERE date = $1${staffWhere}
+    `, [startOfToday.toISOString().split('T')[0], ...staffParams]) as any;
 
     // Category breakdown
-    const categoryBreakdownResult = await db.prepare(`
+    const categoryBreakdownResult = await db.all(`
       SELECT
         category,
         SUM(amount) as amount
       FROM expenses
-      WHERE date >= ? AND date <= ?${staffWhere}
+      WHERE date >= $1 AND date <= $2${staffWhere}
       GROUP BY category
       ORDER BY amount DESC
-    `).all(startOfMonth.toISOString().split('T')[0], endOfMonth.toISOString().split('T')[0], ...staffParams) as any[];
+    `, [startOfMonth.toISOString().split('T')[0], endOfMonth.toISOString().split('T')[0], ...staffParams]) as any[];
 
     const totalByCategory = categoryBreakdownResult.reduce((sum, cat) => sum + cat.amount, 0);
 
@@ -193,24 +193,24 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
     }));
 
     // Weekly trends (last 7 days)
-    const weeklyTrendsResult = await db.prepare(`
+    const weeklyTrendsResult = await db.all(`
       SELECT
-        strftime('%w', date) as dayNum,
-        CASE strftime('%w', date)
-          WHEN '0' THEN 'Sun'
-          WHEN '1' THEN 'Mon'
-          WHEN '2' THEN 'Tue'
-          WHEN '3' THEN 'Wed'
-          WHEN '4' THEN 'Thu'
-          WHEN '5' THEN 'Fri'
-          WHEN '6' THEN 'Sat'
+        EXTRACT(DOW FROM date) as dayNum,
+        CASE EXTRACT(DOW FROM date)
+          WHEN 0 THEN 'Sun'
+          WHEN 1 THEN 'Mon'
+          WHEN 2 THEN 'Tue'
+          WHEN 3 THEN 'Wed'
+          WHEN 4 THEN 'Thu'
+          WHEN 5 THEN 'Fri'
+          WHEN 6 THEN 'Sat'
         END as day,
         SUM(amount) as amount
       FROM expenses
-      WHERE date >= date('now', '-7 days')${staffWhere}
+      WHERE date >= CURRENT_DATE - INTERVAL '7 days'${staffWhere}
       GROUP BY day
       ORDER BY dayNum ASC
-    `).all(...staffParams) as any[];
+    `, staffParams) as any[];
 
     // Fill in missing days with 0
     const dayOrder = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -220,28 +220,28 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
     });
 
     // Monthly trends (last 6 months)
-    const monthlyTrendsResult = await db.prepare(`
+    const monthlyTrendsResult = await db.all(`
       SELECT
-        strftime('%Y-%m', date) as month,
+        TO_CHAR(date, 'YYYY-MM') as month,
         SUM(amount) as amount
       FROM expenses
-      WHERE date >= date('now', '-6 months')${staffWhere}
+      WHERE date >= CURRENT_DATE - INTERVAL '6 months'${staffWhere}
       GROUP BY month
       ORDER BY month ASC
-    `).all(...staffParams) as any[];
+    `, staffParams) as any[];
 
     // Recent expenses
-    const recentExpenses = await db.prepare(`
+    const recentExpenses = await db.all(`
       SELECT e.*, u.name as creator_name
       FROM expenses e
       LEFT JOIN users u ON e.created_by = u.id
       WHERE 1=1${staffWhere}
       ORDER BY e.date DESC, e.created_at DESC
       LIMIT 5
-    `).all(...staffParams);
+    `, staffParams);
 
     // Status breakdown
-    const statusBreakdownResult = await db.prepare(`
+    const statusBreakdownResult = await db.all(`
       SELECT
         status,
         COUNT(*) as count,
@@ -249,7 +249,7 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
       FROM expenses
       WHERE 1=1${staffWhere}
       GROUP BY status
-    `).all(...staffParams) as any[];
+    `, staffParams) as any[];
 
     const statusBreakdown = statusBreakdownResult.map(s => ({
       status: s.status,
@@ -258,7 +258,7 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
     }));
 
     // Payment method breakdown
-    const paymentMethodResult = await db.prepare(`
+    const paymentMethodResult = await db.all(`
       SELECT
         payment_method,
         SUM(amount) as amount,
@@ -266,7 +266,7 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
       FROM expenses
       WHERE payment_method IS NOT NULL${staffWhere}
       GROUP BY payment_method
-    `).all(...staffParams) as any[];
+    `, staffParams) as any[];
 
     const paymentMethodBreakdown = paymentMethodResult.map(p => ({
       method: p.payment_method,
@@ -299,12 +299,12 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
 router.get('/:id', authenticateToken, async (req: any, res: any) => {
   try {
     const { id } = req.params;
-    const expense = await db.prepare(`
+    const expense = await db.get(`
       SELECT e.*, u.name as creator_name
       FROM expenses e
       LEFT JOIN users u ON e.created_by = u.id
-      WHERE e.id = ?
-    `).get(id);
+      WHERE e.id = $1
+    `, [id]);
 
     if (!expense) {
       return res.status(404).json({ error: 'Expense not found' });
@@ -335,10 +335,10 @@ router.post('/', authenticateToken, async (req: any, res: any) => {
     const now = new Date().toISOString();
     const createdBy = req.user.id; // Always use authenticated user's ID
 
-    await db.prepare(`
+    await db.run(`
       INSERT INTO expenses (id, title, category, amount, date, status, payment_method, vendor, notes, created_by, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    `, [
       id,
       title,
       category,
@@ -351,14 +351,14 @@ router.post('/', authenticateToken, async (req: any, res: any) => {
       createdBy,
       now,
       now
-    );
+    ]);
 
-    const expense = await db.prepare(`
+    const expense = await db.get(`
       SELECT e.*, u.name as creator_name
       FROM expenses e
       LEFT JOIN users u ON e.created_by = u.id
-      WHERE e.id = ?
-    `).get(id);
+      WHERE e.id = $1
+    `, [id]);
     res.status(201).json(transformExpense(expense));
   } catch (error) {
     console.error('Error creating expense:', error);
@@ -372,7 +372,7 @@ router.patch('/:id', authenticateToken, async (req: any, res: any) => {
     const { id } = req.params;
     const { title, category, amount, date, status, paymentMethod, vendor, notes } = req.body;
 
-    const existing = await db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+    const existing = await db.get('SELECT * FROM expenses WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Expense not found' });
     }
@@ -384,19 +384,19 @@ router.patch('/:id', authenticateToken, async (req: any, res: any) => {
 
     const now = new Date().toISOString();
 
-    await db.prepare(`
+    await db.run(`
       UPDATE expenses SET
-        title = COALESCE(?, title),
-        category = COALESCE(?, category),
-        amount = COALESCE(?, amount),
-        date = COALESCE(?, date),
-        status = COALESCE(?, status),
-        payment_method = ?,
-        vendor = ?,
-        notes = ?,
-        updated_at = ?
-      WHERE id = ?
-    `).run(
+        title = COALESCE($1, title),
+        category = COALESCE($2, category),
+        amount = COALESCE($3, amount),
+        date = COALESCE($4, date),
+        status = COALESCE($5, status),
+        payment_method = $6,
+        vendor = $7,
+        notes = $8,
+        updated_at = $9
+      WHERE id = $10
+    `, [
       title || null,
       category || null,
       amount || null,
@@ -407,14 +407,14 @@ router.patch('/:id', authenticateToken, async (req: any, res: any) => {
       notes !== undefined ? notes : (existing as any).notes,
       now,
       id
-    );
+    ]);
 
-    const expense = await db.prepare(`
+    const expense = await db.get(`
       SELECT e.*, u.name as creator_name
       FROM expenses e
       LEFT JOIN users u ON e.created_by = u.id
-      WHERE e.id = ?
-    `).get(id);
+      WHERE e.id = $1
+    `, [id]);
     res.json(transformExpense(expense));
   } catch (error) {
     console.error('Error updating expense:', error);
@@ -427,7 +427,7 @@ router.delete('/:id', authenticateToken, async (req: any, res: any) => {
   try {
     const { id } = req.params;
 
-    const existing = await db.prepare('SELECT * FROM expenses WHERE id = ?').get(id);
+    const existing = await db.get('SELECT * FROM expenses WHERE id = $1', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Expense not found' });
     }
@@ -437,7 +437,7 @@ router.delete('/:id', authenticateToken, async (req: any, res: any) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    await db.prepare('DELETE FROM expenses WHERE id = ?').run(id);
+    await db.run('DELETE FROM expenses WHERE id = $1', [id]);
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {
     console.error('Error deleting expense:', error);

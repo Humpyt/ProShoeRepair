@@ -20,7 +20,7 @@ router.get('/discounts', async (req, res) => {
     const { startOfMonth, endOfMonth } = getDateBoundaries();
 
     // Get summary statistics
-    const summaryResult = await db.prepare(`
+    const summaryResult = await db.get(`
       SELECT
         COUNT(*) as totalOperations,
         COALESCE(SUM(discount), 0) as totalDiscounts,
@@ -28,24 +28,24 @@ router.get('/discounts', async (req, res) => {
         COUNT(CASE WHEN discount > 0 THEN 1 END) as operationsWithDiscount
       FROM operations
       WHERE discount > 0
-    `).get() as any;
+    `) as any;
 
     const totalOperationsWithDiscount = summaryResult.operationsWithDiscount || 0;
     const totalDiscounts = summaryResult.totalDiscounts || 0;
     const averageDiscountPercent = summaryResult.averageDiscountPercent || 0;
 
     // Get discounts by period (last 30 days)
-    const byPeriodResult = await db.prepare(`
+    const byPeriodResult = await db.all(`
       SELECT
         DATE(created_at) as date,
         SUM(discount) as total,
         COUNT(*) as count
       FROM operations
       WHERE discount > 0
-        AND created_at >= DATE('now', '-30 days')
+        AND created_at >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).all() as any[];
+    `) as any[];
 
     const byPeriod = byPeriodResult.map(row => ({
       date: row.date,
@@ -54,7 +54,7 @@ router.get('/discounts', async (req, res) => {
     }));
 
     // Get top discounted operations
-    const topDiscountedResult = await db.prepare(`
+    const topDiscountedResult = await db.all(`
       SELECT
         o.id,
         c.name as customerName,
@@ -66,7 +66,7 @@ router.get('/discounts', async (req, res) => {
       WHERE o.discount > 0
       ORDER BY o.discount DESC
       LIMIT 10
-    `).all() as any[];
+    `) as any[];
 
     const topDiscounted = topDiscountedResult.map(row => ({
       id: row.id,
@@ -97,35 +97,35 @@ router.get('/new-customers', async (req, res) => {
     const { startOfToday, endOfToday, startOfWeek, startOfMonth } = getDateBoundaries();
 
     // Get summary counts
-    const totalResult = await db.prepare(`
+    const totalResult = await db.get(`
       SELECT COUNT(*) as total FROM customers
-    `).get() as any;
+    `) as any;
 
-    const thisMonthResult = await db.prepare(`
+    const thisMonthResult = await db.get(`
       SELECT COUNT(*) as count FROM customers
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfMonth, endOfMonth) as any;
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfMonth, endOfMonth]) as any;
 
-    const thisWeekResult = await db.prepare(`
+    const thisWeekResult = await db.get(`
       SELECT COUNT(*) as count FROM customers
-      WHERE created_at >= ?
-    `).get(startOfWeek) as any;
+      WHERE created_at >= $1
+    `, [startOfWeek]) as any;
 
-    const todayResult = await db.prepare(`
+    const todayResult = await db.get(`
       SELECT COUNT(*) as count FROM customers
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfToday, endOfToday) as any;
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfToday, endOfToday]) as any;
 
     // Get trend (daily new customers for last 30 days)
-    const trendResult = await db.prepare(`
+    const trendResult = await db.all(`
       SELECT
         DATE(created_at) as date,
         COUNT(*) as count
       FROM customers
-      WHERE created_at >= DATE('now', '-30 days')
+      WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).all() as any[];
+    `) as any[];
 
     const trend = trendResult.map(row => ({
       date: row.date,
@@ -133,7 +133,7 @@ router.get('/new-customers', async (req, res) => {
     }));
 
     // Get recent customers
-    const recentCustomersResult = await db.prepare(`
+    const recentCustomersResult = await db.all(`
       SELECT
         id,
         name,
@@ -143,7 +143,7 @@ router.get('/new-customers', async (req, res) => {
       FROM customers
       ORDER BY created_at DESC
       LIMIT 10
-    `).all() as any[];
+    `) as any[];
 
     const recentCustomers = recentCustomersResult.map(row => ({
       id: row.id,
@@ -173,7 +173,7 @@ router.get('/new-customers', async (req, res) => {
 router.get('/customer-rankings', async (req, res) => {
   try {
     // Get all customers ordered by total_spent
-    const bySpentResult = await db.prepare(`
+    const bySpentResult = await db.all(`
       SELECT
         id,
         name,
@@ -185,7 +185,7 @@ router.get('/customer-rankings', async (req, res) => {
       WHERE status = 'active'
       ORDER BY total_spent DESC
       LIMIT 20
-    `).all() as any[];
+    `) as any[];
 
     const bySpent = bySpentResult.map(row => ({
       id: row.id,
@@ -197,7 +197,7 @@ router.get('/customer-rankings', async (req, res) => {
     }));
 
     // Get all customers ordered by order count
-    const byOrdersResult = await db.prepare(`
+    const byOrdersResult = await db.all(`
       SELECT
         id,
         name,
@@ -209,7 +209,7 @@ router.get('/customer-rankings', async (req, res) => {
       WHERE status = 'active'
       ORDER BY total_orders DESC
       LIMIT 20
-    `).all() as any[];
+    `) as any[];
 
     const byOrders = byOrdersResult.map(row => ({
       id: row.id,
@@ -221,7 +221,7 @@ router.get('/customer-rankings', async (req, res) => {
     }));
 
     // Get all customers ordered by loyalty points
-    const byLoyaltyResult = await db.prepare(`
+    const byLoyaltyResult = await db.all(`
       SELECT
         id,
         name,
@@ -232,7 +232,7 @@ router.get('/customer-rankings', async (req, res) => {
       WHERE status = 'active'
       ORDER BY loyalty_points DESC
       LIMIT 20
-    `).all() as any[];
+    `) as any[];
 
     const byLoyalty = byLoyaltyResult.map(row => ({
       id: row.id,
@@ -257,7 +257,7 @@ router.get('/customer-rankings', async (req, res) => {
 router.get('/service-performance', async (req, res) => {
   try {
     // Get service performance by revenue
-    const byRevenueResult = await db.prepare(`
+    const byRevenueResult = await db.all(`
       SELECT
         s.id as serviceId,
         s.name as serviceName,
@@ -268,7 +268,7 @@ router.get('/service-performance', async (req, res) => {
       LEFT JOIN operation_services os ON s.id = os.service_id
       GROUP BY s.id, s.name, s.category
       ORDER BY totalRevenue DESC
-    `).all() as any[];
+    `) as any[];
 
     const byRevenue = byRevenueResult.map(row => ({
       serviceId: row.serviceId,
@@ -279,7 +279,7 @@ router.get('/service-performance', async (req, res) => {
     }));
 
     // Get service performance by order count
-    const byOrdersResult = await db.prepare(`
+    const byOrdersResult = await db.all(`
       SELECT
         s.id as serviceId,
         s.name as serviceName,
@@ -290,7 +290,7 @@ router.get('/service-performance', async (req, res) => {
       LEFT JOIN operation_services os ON s.id = os.service_id
       GROUP BY s.id, s.name, s.category
       ORDER BY orderCount DESC
-    `).all() as any[];
+    `) as any[];
 
     const byOrders = byOrdersResult.map(row => ({
       serviceId: row.serviceId,
@@ -301,7 +301,7 @@ router.get('/service-performance', async (req, res) => {
     }));
 
     // Get category breakdown
-    const categoryBreakdownResult = await db.prepare(`
+    const categoryBreakdownResult = await db.all(`
       SELECT
         COALESCE(s.category, 'Uncategorized') as category,
         COALESCE(SUM(os.price * os.quantity), 0) as totalRevenue,
@@ -310,7 +310,7 @@ router.get('/service-performance', async (req, res) => {
       LEFT JOIN operation_services os ON s.id = os.service_id
       GROUP BY s.category
       ORDER BY totalRevenue DESC
-    `).all() as any[];
+    `) as any[];
 
     const categoryBreakdown = categoryBreakdownResult.map(row => ({
       category: row.category || 'Uncategorized',
@@ -335,38 +335,38 @@ router.get('/unpaid-balances', async (req, res) => {
     const now = new Date();
 
     // Get summary statistics
-    const summaryResult = await db.prepare(`
+    const summaryResult = await db.get(`
       SELECT
         COALESCE(SUM(total_amount - paid_amount), 0) as totalUnpaid,
         COUNT(CASE WHEN (total_amount - paid_amount) > 0 THEN 1 END) as partialPaymentCount,
         COUNT(CASE WHEN (total_amount - paid_amount) = total_amount
-                   AND created_at < DATE('now', '-30 days') THEN 1 END) as overdueCount
+                   AND created_at < CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as overdueCount
       FROM operations
       WHERE total_amount > paid_amount
-    `).get() as any;
+    `) as any;
 
     // Get aging analysis
-    const agingResult = await db.prepare(`
+    const agingResult = await db.get(`
       SELECT
-        COUNT(CASE WHEN created_at >= DATE('now', '-30 days') THEN 1 END) as currentCount,
-        COALESCE(SUM(CASE WHEN created_at >= DATE('now', '-30 days')
+        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as currentCount,
+        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days'
                           THEN total_amount - paid_amount ELSE 0 END), 0) as currentBalance,
-        COUNT(CASE WHEN created_at >= DATE('now', '-60 days')
-                   AND created_at < DATE('now', '-30 days') THEN 1 END) as aging30Count,
-        COALESCE(SUM(CASE WHEN created_at >= DATE('now', '-60 days')
-                          AND created_at < DATE('now', '-30 days')
+        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '60 days'
+                   AND created_at < CURRENT_DATE - INTERVAL '30 days' THEN 1 END) as aging30Count,
+        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '60 days'
+                          AND created_at < CURRENT_DATE - INTERVAL '30 days'
                           THEN total_amount - paid_amount ELSE 0 END), 0) as aging30Balance,
-        COUNT(CASE WHEN created_at >= DATE('now', '-90 days')
-                   AND created_at < DATE('now', '-60 days') THEN 1 END) as aging60Count,
-        COALESCE(SUM(CASE WHEN created_at >= DATE('now', '-90 days')
-                          AND created_at < DATE('now', '-60 days')
+        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '90 days'
+                   AND created_at < CURRENT_DATE - INTERVAL '60 days' THEN 1 END) as aging60Count,
+        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '90 days'
+                          AND created_at < CURRENT_DATE - INTERVAL '60 days'
                           THEN total_amount - paid_amount ELSE 0 END), 0) as aging60Balance,
-        COUNT(CASE WHEN created_at < DATE('now', '-90 days') THEN 1 END) as overdueCount,
-        COALESCE(SUM(CASE WHEN created_at < DATE('now', '-90 days')
+        COUNT(CASE WHEN created_at < CURRENT_DATE - INTERVAL '90 days' THEN 1 END) as overdueCount,
+        COALESCE(SUM(CASE WHEN created_at < CURRENT_DATE - INTERVAL '90 days'
                           THEN total_amount - paid_amount ELSE 0 END), 0) as overdueBalance
       FROM operations
       WHERE total_amount > paid_amount
-    `).get() as any;
+    `) as any;
 
     const agingAnalysis = {
       current: {
@@ -388,7 +388,7 @@ router.get('/unpaid-balances', async (req, res) => {
     };
 
     // Get unpaid operations
-    const unpaidOperationsResult = await db.prepare(`
+    const unpaidOperationsResult = await db.all(`
       SELECT
         o.id,
         o.customer_id as customerId,
@@ -404,7 +404,7 @@ router.get('/unpaid-balances', async (req, res) => {
       WHERE o.total_amount > o.paid_amount
       ORDER BY o.created_at ASC
       LIMIT 50
-    `).all() as any[];
+    `) as any[];
 
     const unpaidOperations = unpaidOperationsResult.map(row => {
       const createdAtDate = new Date(row.createdAtRaw);
@@ -447,42 +447,42 @@ router.get('/profit-summary', async (req, res) => {
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     // Total sales (all time)
-    const totalSalesResult = await db.prepare(`
+    const totalSalesResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total FROM operations
-    `).get() as any;
+    `) as any;
 
     // Total expenses (all time)
-    const totalExpensesResult = await db.prepare(`
+    const totalExpensesResult = await db.get(`
       SELECT COALESCE(SUM(amount), 0) as total FROM expenses
-    `).get() as any;
+    `) as any;
 
     // Sales this month
-    const salesThisMonthResult = await db.prepare(`
+    const salesThisMonthResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_at >= ?
-    `).get(startOfMonth.toISOString()) as any;
+      WHERE created_at >= $1
+    `, [startOfMonth.toISOString()]) as any;
 
     // Sales last month
-    const salesLastMonthResult = await db.prepare(`
+    const salesLastMonthResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfLastMonth.toISOString(), endOfLastMonth.toISOString()) as any;
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfLastMonth.toISOString(), endOfLastMonth.toISOString()]) as any;
 
     // Expenses this month
-    const expensesThisMonthResult = await db.prepare(`
+    const expensesThisMonthResult = await db.get(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM expenses
-      WHERE date >= ?
-    `).get(startOfMonth.toISOString().split('T')[0]) as any;
+      WHERE date >= $1
+    `, [startOfMonth.toISOString().split('T')[0]]) as any;
 
     // Expenses last month
-    const expensesLastMonthResult = await db.prepare(`
+    const expensesLastMonthResult = await db.get(`
       SELECT COALESCE(SUM(amount), 0) as total
       FROM expenses
-      WHERE date >= ? AND date <= ?
-    `).get(startOfLastMonth.toISOString().split('T')[0], endOfLastMonth.toISOString().split('T')[0]) as any;
+      WHERE date >= $1 AND date <= $2
+    `, [startOfLastMonth.toISOString().split('T')[0], endOfLastMonth.toISOString().split('T')[0]]) as any;
 
     // Calculate values
     const totalSales = totalSalesResult?.total || 0;
@@ -508,25 +508,25 @@ router.get('/profit-summary', async (req, res) => {
       : 0;
 
     // Get monthly breakdown for last 6 months
-    const monthlyBreakdownResult = await db.prepare(`
+    const monthlyBreakdownResult = await db.all(`
       SELECT
-        strftime('%Y-%m', created_at) as month,
+        TO_CHAR(created_at, 'YYYY-MM') as month,
         SUM(total_amount) as sales
       FROM operations
-      WHERE created_at >= date('now', '-6 months')
-      GROUP BY strftime('%Y-%m', created_at)
+      WHERE created_at >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY TO_CHAR(created_at, 'YYYY-MM')
       ORDER BY month ASC
-    `).all() as any[];
+    `) as any[];
 
-    const monthlyExpenseResult = await db.prepare(`
+    const monthlyExpenseResult = await db.all(`
       SELECT
-        strftime('%Y-%m', date) as month,
+        TO_CHAR(date, 'YYYY-MM') as month,
         SUM(amount) as expenses
       FROM expenses
-      WHERE date >= date('now', '-6 months')
-      GROUP BY strftime('%Y-%m', date)
+      WHERE date >= CURRENT_DATE - INTERVAL '6 months'
+      GROUP BY TO_CHAR(date, 'YYYY-MM')
       ORDER BY month ASC
-    `).all() as any[];
+    `) as any[];
 
     // Combine monthly data
     const monthlyDataMap = new Map<string, { sales: number; expenses: number; profit: number }>();
@@ -576,33 +576,33 @@ router.get('/daily-balance', async (req, res) => {
 
     // Get sales breakdown by payment method from operation_payments
     // Use date() function for proper date comparison (created_at is ISO format)
-    const salesResult = await db.prepare(`
+    const salesResult = await db.all(`
       SELECT
         COALESCE(op.payment_method, 'Cash') as paymentMethod,
         COALESCE(SUM(op.amount), 0) as total
       FROM operation_payments op
-      WHERE date(op.created_at) = date(?)
+      WHERE DATE(op.created_at) = DATE($1)
       GROUP BY op.payment_method
-    `).all(targetDate) as any[];
+    `, [targetDate]) as any[];
 
     // Get expenses breakdown by payment method
-    const expensesResult = await db.prepare(`
+    const expensesResult = await db.all(`
       SELECT
         COALESCE(payment_method, 'Cash') as paymentMethod,
         COALESCE(SUM(amount), 0) as total
       FROM expenses
-      WHERE date = ?
+      WHERE date = $1
       GROUP BY payment_method
-    `).all(targetDate) as any[];
+    `, [targetDate]) as any[];
 
     // Get expense details with staff names
-    const expenseDetailsResult = await db.prepare(`
+    const expenseDetailsResult = await db.all(`
       SELECT e.*, u.name as created_by_name
       FROM expenses e
       LEFT JOIN users u ON e.created_by = u.id
-      WHERE e.date = ?
+      WHERE e.date = $1
       ORDER BY e.created_at DESC
-    `).all(targetDate) as any[];
+    `, [targetDate]) as any[];
 
     const expenseDetails = expenseDetailsResult.map((e: any) => ({
       id: e.id,
@@ -689,12 +689,12 @@ router.get('/daily-balance', async (req, res) => {
 // GET /api/analytics/daily-balance/archives - List all archived dates
 router.get('/daily-balance/archives', async (req, res) => {
   try {
-    const archives = await db.prepare(`
+    const archives = await db.all(`
       SELECT id, date, sales_total, expenses_total, cash_at_hand, net_balance, created_at
       FROM daily_balance_archives
       ORDER BY date DESC
       LIMIT 50
-    `).all() as any[];
+    `) as any[];
 
     res.json(archives.map((a: any) => ({
       id: a.id,
@@ -718,12 +718,12 @@ router.get('/daily-balance/archives/month/:year/:month', async (req, res) => {
     const startDate = `${year}-${month.padStart(2, '0')}-01`;
     const endDate = `${year}-${month.padStart(2, '0')}-31`;
 
-    const archives = await db.prepare(`
+    const archives = await db.all(`
       SELECT id, date, sales_total, expenses_total, cash_at_hand, net_balance
       FROM daily_balance_archives
-      WHERE date >= ? AND date <= ?
+      WHERE date >= $1 AND date <= $2
       ORDER BY date ASC
-    `).all(startDate, endDate) as any[];
+    `, [startDate, endDate]) as any[];
 
     res.json(archives.map((a: any) => ({
       date: a.date,
@@ -740,9 +740,9 @@ router.get('/daily-balance/archive/:date', async (req, res) => {
   try {
     const { date } = req.params;
 
-    const archive = await db.prepare(`
-      SELECT * FROM daily_balance_archives WHERE date = ?
-    `).get(date) as any;
+    const archive = await db.get(`
+      SELECT * FROM daily_balance_archives WHERE date = $1
+    `, [date]) as any;
 
     if (!archive) {
       return res.status(404).json({ error: 'Archive not found for this date' });
@@ -761,26 +761,26 @@ router.post('/daily-balance/archive', async (req, res) => {
     const { date, data } = req.body;
 
     // Check if archive already exists for this date
-    const existing = await db.prepare(`
-      SELECT id FROM daily_balance_archives WHERE date = ?
-    `).get(date) as any;
+    const existing = await db.get(`
+      SELECT id FROM daily_balance_archives WHERE date = $1
+    `, [date]) as any;
 
     const id = existing?.id || `archive_${date}_${Date.now()}`;
     const now = new Date().toISOString();
 
     if (existing) {
       // Update existing archive
-      await db.prepare(`
+      await db.run(`
         UPDATE daily_balance_archives
-        SET sales_total = ?, expenses_total = ?, cash_at_hand = ?, net_balance = ?, data_json = ?, created_at = ?
-        WHERE date = ?
-      `).run(data.sales.total, data.expenses.total, data.balance.cashAtHand, data.netBalance, JSON.stringify(data), now, date);
+        SET sales_total = $1, expenses_total = $2, cash_at_hand = $3, net_balance = $4, data_json = $5, created_at = $6
+        WHERE date = $7
+      `, [data.sales.total, data.expenses.total, data.balance.cashAtHand, data.netBalance, JSON.stringify(data), now, date]);
     } else {
       // Insert new archive
-      await db.prepare(`
+      await db.run(`
         INSERT INTO daily_balance_archives (id, date, sales_total, expenses_total, cash_at_hand, net_balance, data_json, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, date, data.sales.total, data.expenses.total, data.balance.cashAtHand, data.netBalance, JSON.stringify(data), now);
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [id, date, data.sales.total, data.expenses.total, data.balance.cashAtHand, data.netBalance, JSON.stringify(data), now]);
     }
 
     res.json({ success: true, id, date });
@@ -795,9 +795,9 @@ router.delete('/daily-balance/archive/:date', async (req, res) => {
   try {
     const { date } = req.params;
 
-    await db.prepare(`
-      DELETE FROM daily_balance_archives WHERE date = ?
-    `).run(date);
+    await db.run(`
+      DELETE FROM daily_balance_archives WHERE date = $1
+    `, [date]);
 
     res.json({ success: true });
   } catch (error) {

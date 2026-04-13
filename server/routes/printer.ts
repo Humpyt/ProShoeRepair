@@ -62,25 +62,25 @@ router.post('/print/order/:id', async (req, res) => {
     const { id } = req.params;
     
     // Get order details with customer info
-    const order = await db.prepare(`
+    const order = await db.get(`
       SELECT o.*, c.name as customer_name, c.phone as customer_phone
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.id = ?
-    `).get(id);
+      WHERE o.id = $1
+    `, [id]);
 
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
 
     // Get shoes and services for the order
-    const shoes = await db.prepare(`
+    const shoes = await db.all(`
       SELECT os.*, s.name as service_name, s.price as service_base_price
       FROM operation_shoes os
       LEFT JOIN operation_services oss ON os.id = oss.operation_shoe_id
       LEFT JOIN services s ON oss.service_id = s.id
-      WHERE os.operation_id = ?
-    `).all(id);
+      WHERE os.operation_id = $1
+    `, [id]);
 
     const { printerModule, escposModule } = await loadPrinterModules();
     
@@ -205,12 +205,12 @@ router.post('/print/quotation/:id', async (req, res) => {
     const { id } = req.params;
     
     // Get quotation details with customer info
-    const quotation = await db.prepare(`
+    const quotation = await db.get(`
       SELECT q.*, c.name as customer_name, c.phone as customer_phone
       FROM quotations q
       LEFT JOIN customers c ON q.customer_id = c.id
-      WHERE q.id = ?
-    `).get(id);
+      WHERE q.id = $1
+    `, [id]);
 
     if (!quotation) {
       return res.status(404).json({ error: 'Quotation not found' });

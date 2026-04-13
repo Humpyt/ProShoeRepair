@@ -8,11 +8,11 @@ const router = express.Router();
 // GET /api/retail-products - Get all active products
 router.get('/', async (req, res) => {
   try {
-    const products = await db.prepare(`
+    const products = await db.all(`
       SELECT * FROM retail_products
       WHERE is_active = 1
       ORDER BY display_order ASC, name ASC
-    `).all();
+    `);
     res.json(products);
   } catch (error) {
     console.error('Error fetching retail products:', error);
@@ -23,12 +23,12 @@ router.get('/', async (req, res) => {
 // GET /api/retail-products/categories - Get unique categories from active products
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await db.prepare(`
+    const categories = await db.all(`
       SELECT DISTINCT category
       FROM retail_products
       WHERE is_active = 1
       ORDER BY category
-    `).all();
+    `);
     res.json(categories.map((c: any) => c.category));
   } catch (error) {
     console.error('Error fetching retail product categories:', error);
@@ -40,11 +40,11 @@ router.get('/categories', async (req, res) => {
 router.get('/category/:category', async (req, res) => {
   try {
     const { category } = req.params;
-    const products = await db.prepare(`
+    const products = await db.all(`
       SELECT * FROM retail_products
-      WHERE is_active = 1 AND category = ?
+      WHERE is_active = 1 AND category = $1
       ORDER BY display_order ASC, name ASC
-    `).all(category);
+    `, [category]);
     res.json(products);
   } catch (error) {
     console.error('Error fetching products by category:', error);
@@ -64,12 +64,12 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
     const id = uuidv4();
     const now = new Date().toISOString();
 
-    await db.prepare(`
+    await db.run(`
       INSERT INTO retail_products (
         id, name, category, description, default_price, icon, display_order, image_url,
         is_active, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
-    `).run(
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10)
+    `, [
       id,
       name,
       category,
@@ -80,9 +80,9 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
       image_url || null,
       now,
       now
-    );
+    ]);
 
-    const newProduct = await db.prepare('SELECT * FROM retail_products WHERE id = ?').get(id);
+    const newProduct = await db.get('SELECT * FROM retail_products WHERE id = $1', [id]);
     res.status(201).json(newProduct);
   } catch (error) {
     console.error('Error creating retail product:', error);
@@ -100,6 +100,7 @@ router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => 
     // Build dynamic SET clause from provided fields
     const setClauses: string[] = [];
     const values: any[] = [];
+    let paramIndex = 1;
 
     const fieldMap: Record<string, string> = {
       name: 'name',
@@ -114,26 +115,26 @@ router.put('/:id', authenticateToken, requireRole('admin'), async (req, res) => 
 
     for (const [key, dbField] of Object.entries(fieldMap)) {
       if (key in updates) {
-        setClauses.push(`${dbField} = ?`);
+        setClauses.push(`${dbField} = $${paramIndex++}`);
         values.push(updates[key]);
       }
     }
 
     // Always update updated_at
-    setClauses.push('updated_at = ?');
+    setClauses.push(`updated_at = $${paramIndex++}`);
     values.push(now);
 
     // Add id as final parameter
     values.push(id);
 
-    const result = await db.prepare(`
+    const result = await db.run(`
       UPDATE retail_products
       SET ${setClauses.join(', ')}
-      WHERE id = ?
-    `).run(...values);
+      WHERE id = $${paramIndex}
+    `, values);
 
-    if ((result as any).changes > 0) {
-      const updatedProduct = await db.prepare('SELECT * FROM retail_products WHERE id = ?').get(id);
+    if ((result as any).rowCount > 0) {
+      const updatedProduct = await db.get('SELECT * FROM retail_products WHERE id = $1', [id]);
       res.json(updatedProduct);
     } else {
       res.status(404).json({ error: 'Product not found' });
@@ -150,13 +151,13 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
     const { id } = req.params;
     const now = new Date().toISOString();
 
-    const result = await db.prepare(`
+    const result = await db.run(`
       UPDATE retail_products
-      SET is_active = 0, updated_at = ?
-      WHERE id = ? AND is_active = 1
-    `).run(now, id);
+      SET is_active = 0, updated_at = $1
+      WHERE id = $2 AND is_active = 1
+    `, [now, id]);
 
-    if ((result as any).changes > 0) {
+    if ((result as any).rowCount > 0) {
       res.json({ message: 'Product deactivated successfully' });
     } else {
       res.status(404).json({ error: 'Product not found or already inactive' });

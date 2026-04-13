@@ -20,29 +20,29 @@ router.get('/', async (req, res) => {
 
     const params = [];
     if (startDate) {
-      query += ' AND s.created_at >= ?';
+      query += ` AND s.created_at >= $${params.length + 1}`;
       params.push(startDate);
     }
     if (endDate) {
-      query += ' AND s.created_at <= ?';
+      query += ` AND s.created_at <= $${params.length + 1}`;
       params.push(endDate);
     }
     if (saleType) {
-      query += ' AND s.sale_type = ?';
+      query += ` AND s.sale_type = $${params.length + 1}`;
       params.push(saleType);
     }
 
     query += ' ORDER BY s.created_at DESC';
     
-    const sales = await db.prepare(query).all(...params);
+    const sales = await db.all(query, params);
 
     // Get details for each sale
     const salesWithDetails = [];
     for (const sale of sales) {
       let details: any[] = [];
       if (sale.sale_type === 'repair') {
-        details = await db.prepare(`
-          SELECT 
+        details = await db.all(`
+          SELECT
             os.category,
             srv.name as service_name,
             osrv.price
@@ -50,18 +50,18 @@ router.get('/', async (req, res) => {
           JOIN operation_shoes os ON o.id = os.operation_id
           JOIN operation_services osrv ON os.id = osrv.operation_shoe_id
           JOIN services srv ON srv.id = osrv.service_id
-          WHERE o.id = ?
-        `).all(sale.reference_id);
+          WHERE o.id = $1
+        `, [sale.reference_id]);
       } else if (sale.sale_type === 'retail') {
-        details = await db.prepare(`
-          SELECT 
+        details = await db.all(`
+          SELECT
             si.name,
             si.price,
             oi.quantity
           FROM order_items oi
           JOIN sales_items si ON si.id = oi.item_id
-          WHERE oi.order_id = ?
-        `).all(sale.reference_id);
+          WHERE oi.order_id = $1
+        `, [sale.reference_id]);
       }
 
       salesWithDetails.push({
@@ -84,12 +84,12 @@ router.post('/', authenticateToken, async (req, res) => {
     const now = new Date().toISOString();
     const userId = req.user?.id || null;
 
-    const result = await db.prepare(`
+    const result = await db.run(`
       INSERT INTO sales (
         id, customer_id, sale_type, reference_id,
         total_amount, payment_method, created_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `, [
       uuidv4(),
       customerId,
       saleType,
@@ -99,7 +99,7 @@ router.post('/', authenticateToken, async (req, res) => {
       userId,
       now,
       now
-    );
+    ]);
 
     if ((result as any).changes > 0) {
       res.status(201).json({ success: true });

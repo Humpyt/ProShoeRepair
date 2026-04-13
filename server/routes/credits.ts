@@ -14,7 +14,7 @@ router.post('/:customerId/credits', async (req, res) => {
     }
 
     // Get current balance
-    const customer = await db.get('SELECT account_balance FROM customers WHERE id = ?', [customerId]);
+    const customer = await db.get('SELECT account_balance FROM customers WHERE id = $1', [customerId]);
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
@@ -25,25 +25,22 @@ router.post('/:customerId/credits', async (req, res) => {
     const now = new Date().toISOString();
 
     // Start transaction
-    await db.run('BEGIN TRANSACTION');
+    await db.withTransaction(async () => {
+      // Add transaction record
+      await db.run(`
+        INSERT INTO customer_credits (id, customer_id, amount, balance_after, type, description, created_by, created_at)
+        VALUES ($1, $2, $3, $4, 'credit', $5, $6, $7)
+      `, [transactionId, customerId, amount, newBalance, description, createdBy, now]);
 
-    // Add transaction record
-    await db.run(`
-      INSERT INTO customer_credits (id, customer_id, amount, balance_after, type, description, created_by, created_at)
-      VALUES (?, ?, ?, ?, 'credit', ?, ?, ?)
-    `, [transactionId, customerId, amount, newBalance, description, createdBy, now]);
-
-    // Update customer balance
-    await db.run('UPDATE customers SET account_balance = ?, updated_at = ? WHERE id = ?', [newBalance, now, customerId]);
-
-    await db.run('COMMIT');
+      // Update customer balance
+      await db.run('UPDATE customers SET account_balance = $1, updated_at = $2 WHERE id = $3', [newBalance, now, customerId]);
+    });
 
     // Return updated customer
-    const updatedCustomer = await db.get('SELECT * FROM customers WHERE id = ?', [customerId]);
+    const updatedCustomer = await db.get('SELECT * FROM customers WHERE id = $1', [customerId]);
     res.json(updatedCustomer);
 
   } catch (error) {
-    await db.run('ROLLBACK');
     console.error('Error adding credit:', error);
     res.status(500).json({ error: 'Failed to add credit' });
   }
@@ -56,7 +53,7 @@ router.post('/:customerId/apply-credit-to-debts', async (req, res) => {
     const now = new Date().toISOString();
 
     // Get customer's current credit balance
-    const customer = await db.get('SELECT account_balance FROM customers WHERE id = ?', [customerId]);
+    const customer = await db.get('SELECT account_balance FROM customers WHERE id = $1', [customerId]);
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
@@ -67,80 +64,79 @@ router.post('/:customerId/apply-credit-to-debts', async (req, res) => {
     }
 
     // Get all unpaid operations for this customer
-    const unpaidOperations = await db.prepare(`
+    const unpaidOperations = await db.all(`
       SELECT * FROM operations
-      WHERE customer_id = ? AND total_amount > COALESCE(paid_amount, 0)
+      WHERE customer_id = $1 AND total_amount > COALESCE(paid_amount, 0)
       ORDER BY created_at ASC
-    `).all(customerId);
+    `, [customerId]);
 
     if (unpaidOperations.length === 0) {
       return res.json({ success: true, message: 'No outstanding debts', paymentsMade: [], remainingCredit: availableCredit });
     }
 
-    await db.run('BEGIN TRANSACTION');
     const paymentsMade = [];
     let remainingCredit = availableCredit;
 
     try {
-      // Apply credit to debts (oldest first)
-      for (const operation of unpaidOperations) {
-        if (remainingCredit <= 0) break;
+      await db.withTransaction(async () => {
+        // Apply credit to debts (oldest first)
+        for (const operation of unpaidOperations) {
+          if (remainingCredit <= 0) break;
 
-        const operationBalance = operation.total_amount - (operation.paid_amount || 0);
-        const paymentAmount = Math.min(remainingCredit, operationBalance);
+          const operationBalance = operation.total_amount - (operation.paid_amount || 0);
+          const paymentAmount = Math.min(remainingCredit, operationBalance);
 
-        if (paymentAmount > 0) {
-          // Create payment record
-          const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          await db.run(`
-            INSERT INTO operation_payments (id, operation_id, payment_method, amount, transaction_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-          `, [paymentId, operation.id, 'store_credit', paymentAmount, `auto-credit-${paymentId.slice(-8)}`, now]);
+          if (paymentAmount > 0) {
+            // Create payment record
+            const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            await db.run(`
+              INSERT INTO operation_payments (id, operation_id, payment_method, amount, transaction_id, created_at)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [paymentId, operation.id, 'store_credit', paymentAmount, `auto-credit-${paymentId.slice(-8)}`, now]);
 
-          // Update operation paid amount
-          const newPaidAmount = (operation.paid_amount || 0) + paymentAmount;
-          await db.run(`
-            UPDATE operations
-            SET paid_amount = ?,
-                status = CASE WHEN ? >= total_amount THEN 'completed' ELSE status END,
-                updated_at = ?
-            WHERE id = ?
-          `, [newPaidAmount, newPaidAmount, now, operation.id]);
+            // Update operation paid amount
+            const newPaidAmount = (operation.paid_amount || 0) + paymentAmount;
+            await db.run(`
+              UPDATE operations
+              SET paid_amount = $1,
+                  status = CASE WHEN $2 >= total_amount THEN 'completed' ELSE status END,
+                  updated_at = $3
+              WHERE id = $4
+            `, [newPaidAmount, newPaidAmount, now, operation.id]);
 
-          // Deduct from customer credit
-          await db.run(`
-            UPDATE customers
-            SET account_balance = account_balance - ?
-            WHERE id = ?
-          `, [paymentAmount, customerId]);
+            // Deduct from customer credit
+            await db.run(`
+              UPDATE customers
+              SET account_balance = account_balance - $1
+              WHERE id = $2
+            `, [paymentAmount, customerId]);
 
-          // Record credit debit transaction
-          await db.run(`
-            INSERT INTO customer_credits (id, customer_id, type, amount, description, balance_after, created_at)
-            VALUES (?, ?, 'debit', ?, ?, ?, ?)
-          `, [
-            `credit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            customerId,
-            paymentAmount,
-            `Auto-payment for operation #${operation.id.slice(-6)}`,
-            (customer.account_balance || 0) - paymentAmount,
-            now
-          ]);
+            // Record credit debit transaction
+            await db.run(`
+              INSERT INTO customer_credits (id, customer_id, type, amount, description, balance_after, created_at)
+              VALUES ($1, $2, 'debit', $3, $4, $5, $6)
+            `, [
+              `credit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              customerId,
+              paymentAmount,
+              `Auto-payment for operation #${operation.id.slice(-6)}`,
+              (customer.account_balance || 0) - paymentAmount,
+              now
+            ]);
 
-          paymentsMade.push({
-            operationId: operation.id,
-            amount: paymentAmount,
-            remainingBalance: operationBalance - paymentAmount
-          });
+            paymentsMade.push({
+              operationId: operation.id,
+              amount: paymentAmount,
+              remainingBalance: operationBalance - paymentAmount
+            });
 
-          remainingCredit -= paymentAmount;
+            remainingCredit -= paymentAmount;
+          }
         }
-      }
-
-      await db.run('COMMIT');
+      });
 
       // Get updated customer info
-      const updatedCustomer = await db.get('SELECT account_balance FROM customers WHERE id = ?', [customerId]);
+      const updatedCustomer = await db.get('SELECT account_balance FROM customers WHERE id = $1', [customerId]);
 
       res.json({
         success: true,
@@ -153,8 +149,8 @@ router.post('/:customerId/apply-credit-to-debts', async (req, res) => {
       });
 
     } catch (error) {
-      await db.run('ROLLBACK');
-      throw error;
+      console.error('Error auto-applying credit to debts:', error);
+      res.status(500).json({ error: 'Failed to apply credit to debts' });
     }
 
   } catch (error) {
@@ -170,7 +166,7 @@ router.get('/:customerId/credits', async (req, res) => {
 
     const transactions = await db.all(`
       SELECT * FROM customer_credits
-      WHERE customer_id = ?
+      WHERE customer_id = $1
       ORDER BY created_at DESC
       LIMIT 50
     `, [customerId]);
@@ -193,7 +189,7 @@ router.post('/:customerId/credits/deduct', async (req, res) => {
     }
 
     // Get current balance
-    const customer = await db.get('SELECT account_balance FROM customers WHERE id = ?', [customerId]);
+    const customer = await db.get('SELECT account_balance FROM customers WHERE id = $1', [customerId]);
     if (!customer) {
       return res.status(404).json({ error: 'Customer not found' });
     }
@@ -209,25 +205,22 @@ router.post('/:customerId/credits/deduct', async (req, res) => {
     const now = new Date().toISOString();
 
     // Start transaction
-    await db.run('BEGIN TRANSACTION');
+    await db.withTransaction(async () => {
+      // Add transaction record
+      await db.run(`
+        INSERT INTO customer_credits (id, customer_id, amount, balance_after, type, description, created_at)
+        VALUES ($1, $2, $3, $4, 'debit', $5, $6)
+      `, [transactionId, customerId, amount, newBalance, description, now]);
 
-    // Add transaction record
-    await db.run(`
-      INSERT INTO customer_credits (id, customer_id, amount, balance_after, type, description, created_at)
-      VALUES (?, ?, ?, ?, 'debit', ?, ?)
-    `, [transactionId, customerId, amount, newBalance, description, now]);
-
-    // Update customer balance
-    await db.run('UPDATE customers SET account_balance = ?, updated_at = ? WHERE id = ?', [newBalance, now, customerId]);
-
-    await db.run('COMMIT');
+      // Update customer balance
+      await db.run('UPDATE customers SET account_balance = $1, updated_at = $2 WHERE id = $3', [newBalance, now, customerId]);
+    });
 
     // Return updated customer
-    const updatedCustomer = await db.get('SELECT * FROM customers WHERE id = ?', [customerId]);
+    const updatedCustomer = await db.get('SELECT * FROM customers WHERE id = $1', [customerId]);
     res.json(updatedCustomer);
 
   } catch (error) {
-    await db.run('ROLLBACK');
     console.error('Error deducting credit:', error);
     res.status(500).json({ error: 'Failed to deduct credit' });
   }

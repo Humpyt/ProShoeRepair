@@ -46,20 +46,20 @@ router.get('/targets/summary', async (req, res) => {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
     // Calculate total sales from operations (repairs) for current month
-    const operationsResult = await db.prepare(`
+    const operationsResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfMonth, endOfMonth);
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfMonth, endOfMonth]);
 
     const operationsTotal = (operationsResult as any).total || 0;
 
     // Calculate retail sales from sales table
-    const salesResult = await db.prepare(`
+    const salesResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfMonth, endOfMonth);
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfMonth, endOfMonth]);
 
     const salesTotal = (salesResult as any).total || 0;
 
@@ -101,26 +101,26 @@ router.get('/targets/daily', async (req, res) => {
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
 
     // Get daily breakdown from operations
-    const operationsDaily = await db.prepare(`
+    const operationsDaily = await db.all(`
       SELECT
         DATE(created_at) as date,
         SUM(total_amount) as total
       FROM operations
-      WHERE created_at >= ? AND created_at <= ?
+      WHERE created_at >= $1 AND created_at <= $2
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).all(startOfMonth, endOfMonth);
+    `, [startOfMonth, endOfMonth]);
 
     // Get daily breakdown from sales
-    const salesDaily = await db.prepare(`
+    const salesDaily = await db.all(`
       SELECT
         DATE(created_at) as date,
         SUM(total_amount) as total
       FROM sales
-      WHERE created_at >= ? AND created_at <= ?
+      WHERE created_at >= $1 AND created_at <= $2
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).all(startOfMonth, endOfMonth);
+    `, [startOfMonth, endOfMonth]);
 
     // Merge daily totals
     const dailyMap = new Map<string, number>();
@@ -193,33 +193,33 @@ router.get('/targets/staff', async (req, res) => {
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
 
     // Today's operations total
-    const todayOpsResult = await db.prepare(`
+    const todayOpsResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfDay, endOfDay);
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfDay, endOfDay]);
 
     // Today's sales total
-    const todaySalesResult = await db.prepare(`
+    const todaySalesResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfDay, endOfDay);
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfDay, endOfDay]);
 
     const todayTotal = (todayOpsResult as any).total + (todaySalesResult as any).total;
 
     // Monthly total
-    const monthlyOpsResult = await db.prepare(`
+    const monthlyOpsResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfMonth, endOfMonth);
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfMonth, endOfMonth]);
 
-    const monthlySalesResult = await db.prepare(`
+    const monthlySalesResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
-      WHERE created_at >= ? AND created_at <= ?
-    `).get(startOfMonth, endOfMonth);
+      WHERE created_at >= $1 AND created_at <= $2
+    `, [startOfMonth, endOfMonth]);
 
     const monthlyTotal = (monthlyOpsResult as any).total + (monthlySalesResult as any).total;
 
@@ -295,53 +295,53 @@ router.get('/targets/staff/all', async (req, res) => {
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
 
     // Get all staff users
-    const staffUsers = await db.prepare(`
+    const staffUsers = await db.all(`
       SELECT id, name, email, role
       FROM users
       WHERE role IN ('staff', 'manager') AND status = 'active'
       ORDER BY name ASC
-    `).all();
+    `);
 
     // Get performance for each staff member
     const staffPerformance = await Promise.all(
       (staffUsers as any[]).map(async (staff) => {
         // Get their targets
-        const targetData = await db.prepare(`
+        const targetData = await db.get(`
           SELECT daily_target, monthly_target
           FROM staff_targets
-          WHERE user_id = ?
-        `).get(staff.id);
+          WHERE user_id = $1
+        `, [staff.id]);
 
         const dailyTarget = targetData?.daily_target || TARGETS.staffDaily;
         const monthlyTarget = targetData?.monthly_target || TARGETS.staffMonthly;
 
         // Calculate today's sales
-        const todayOpsResult = await db.prepare(`
+        const todayOpsResult = await db.get(`
           SELECT COALESCE(SUM(total_amount), 0) as total
           FROM operations
-          WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-        `).get(staff.id, startOfDay, endOfDay);
+          WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+        `, [staff.id, startOfDay, endOfDay]);
 
-        const todaySalesResult = await db.prepare(`
+        const todaySalesResult = await db.get(`
           SELECT COALESCE(SUM(total_amount), 0) as total
           FROM sales
-          WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-        `).get(staff.id, startOfDay, endOfDay);
+          WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+        `, [staff.id, startOfDay, endOfDay]);
 
         const todayTotal = (todayOpsResult as any)?.total || 0 + (todaySalesResult as any)?.total || 0;
 
         // Calculate monthly sales
-        const monthlyOpsResult = await db.prepare(`
+        const monthlyOpsResult = await db.get(`
           SELECT COALESCE(SUM(total_amount), 0) as total
           FROM operations
-          WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-        `).get(staff.id, startOfMonth, endOfMonth);
+          WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+        `, [staff.id, startOfMonth, endOfMonth]);
 
-        const monthlySalesResult = await db.prepare(`
+        const monthlySalesResult = await db.get(`
           SELECT COALESCE(SUM(total_amount), 0) as total
           FROM sales
-          WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-        `).get(staff.id, startOfMonth, endOfMonth);
+          WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+        `, [staff.id, startOfMonth, endOfMonth]);
 
         const monthlyTotal = (monthlyOpsResult as any)?.total || 0 + (monthlySalesResult as any)?.total || 0;
 
@@ -393,72 +393,72 @@ router.get('/targets/staff/:userId', async (req, res) => {
     const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
 
     // Get staff user
-    const staff = await db.prepare(`
+    const staff = await db.get(`
       SELECT id, name, email, role
       FROM users
-      WHERE id = ? AND status = 'active'
-    `).get(userId);
+      WHERE id = $1 AND status = 'active'
+    `, [userId]);
 
     if (!staff) {
       return res.status(404).json({ error: 'Staff member not found' });
     }
 
     // Get their targets
-    const targetData = await db.prepare(`
+    const targetData = await db.get(`
       SELECT daily_target, monthly_target
       FROM staff_targets
-      WHERE user_id = ?
-    `).get(userId);
+      WHERE user_id = $1
+    `, [userId]);
 
     const dailyTarget = targetData?.daily_target || TARGETS.staffDaily;
     const monthlyTarget = targetData?.monthly_target || TARGETS.staffMonthly;
 
     // Calculate today's sales
-    const todayOpsResult = await db.prepare(`
+    const todayOpsResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-    `).get(userId, startOfDay, endOfDay);
+      WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+    `, [userId, startOfDay, endOfDay]);
 
-    const todaySalesResult = await db.prepare(`
+    const todaySalesResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
-      WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-    `).get(userId, startOfDay, endOfDay);
+      WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+    `, [userId, startOfDay, endOfDay]);
 
     const todayTotal = (todayOpsResult as any)?.total || 0 + (todaySalesResult as any)?.total || 0;
 
     // Calculate monthly sales
-    const monthlyOpsResult = await db.prepare(`
+    const monthlyOpsResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM operations
-      WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-    `).get(userId, startOfMonth, endOfMonth);
+      WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+    `, [userId, startOfMonth, endOfMonth]);
 
-    const monthlySalesResult = await db.prepare(`
+    const monthlySalesResult = await db.get(`
       SELECT COALESCE(SUM(total_amount), 0) as total
       FROM sales
-      WHERE created_by = ? AND created_at >= ? AND created_at <= ?
-    `).get(userId, startOfMonth, endOfMonth);
+      WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
+    `, [userId, startOfMonth, endOfMonth]);
 
     const monthlyTotal = (monthlyOpsResult as any)?.total || 0 + (monthlySalesResult as any)?.total || 0;
 
     // Get daily breakdown for the month
-    const dailyBreakdown = await db.prepare(`
+    const dailyBreakdown = await db.all(`
       SELECT DATE(created_at) as date,
              COALESCE(SUM(total_amount), 0) as total
       FROM (
         SELECT created_at, total_amount
         FROM operations
-        WHERE created_by = ? AND created_at >= ? AND created_at <= ?
+        WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
         UNION ALL
         SELECT created_at, total_amount
         FROM sales
-        WHERE created_by = ? AND created_at >= ? AND created_at <= ?
+        WHERE created_by = $4 AND created_at >= $5 AND created_at <= $6
       )
       GROUP BY DATE(created_at)
       ORDER BY date ASC
-    `).all(userId, startOfMonth, endOfMonth, userId, startOfMonth, endOfMonth);
+    `, [userId, startOfMonth, endOfMonth, userId, startOfMonth, endOfMonth]);
 
     // Calculate metrics
     const todayPercentage = Math.min((todayTotal / dailyTarget) * 100, 100);
@@ -562,7 +562,7 @@ router.put('/targets/staff/:userId/targets', async (req, res) => {
     }
 
     // Check if staff exists
-    const staff = await db.prepare('SELECT id FROM users WHERE id = ?', [userId]).get(userId);
+    const staff = await db.get('SELECT id FROM users WHERE id = $1', [userId]);
     if (!staff) {
       return res.status(404).json({ error: 'Staff member not found' });
     }
@@ -570,48 +570,49 @@ router.put('/targets/staff/:userId/targets', async (req, res) => {
     const now = new Date().toISOString();
 
     // Check if targets exist
-    const existingTargets = await db.prepare(
-      'SELECT id FROM staff_targets WHERE user_id = ?',
+    const existingTargets = await db.get(
+      'SELECT id FROM staff_targets WHERE user_id = $1',
       [userId]
-    ).get();
+    );
 
     if (existingTargets) {
       // Update existing targets
       const updates: string[] = [];
       const values: any[] = [];
+      let paramIndex = 1;
 
       if (daily_target !== undefined) {
-        updates.push('daily_target = ?');
+        updates.push(`daily_target = $${paramIndex++}`);
         values.push(daily_target);
       }
 
       if (monthly_target !== undefined) {
-        updates.push('monthly_target = ?');
+        updates.push(`monthly_target = $${paramIndex++}`);
         values.push(monthly_target);
       }
 
-      updates.push('updated_at = ?');
+      updates.push(`updated_at = $${paramIndex++}`);
       values.push(now);
       values.push(userId);
 
       await db.run(
-        `UPDATE staff_targets SET ${updates.join(', ')} WHERE user_id = ?`,
+        `UPDATE staff_targets SET ${updates.join(', ')} WHERE user_id = $${paramIndex}`,
         values
       );
     } else {
       // Create new targets
       await db.run(
         `INSERT INTO staff_targets (id, user_id, daily_target, monthly_target, effective_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [`${userId}-targets`, userId, daily_target || TARGETS.staffDaily, monthly_target || TARGETS.staffMonthly, now, now, now]
       );
     }
 
     // Return updated targets
-    const updatedTargets = await db.prepare(
-      'SELECT daily_target, monthly_target FROM staff_targets WHERE user_id = ?',
+    const updatedTargets = await db.get(
+      'SELECT daily_target, monthly_target FROM staff_targets WHERE user_id = $1',
       [userId]
-    ).get(userId);
+    );
 
     res.json({
       success: true,
@@ -639,26 +640,26 @@ router.get('/commissions/archives', async (req, res) => {
     const params: any[] = [];
 
     if (year) {
-      query += ' AND ca.year = ?';
+      query += ` AND ca.year = $${params.length + 1}`;
       params.push(Number(year));
     }
     if (month) {
-      query += ' AND ca.month = ?';
+      query += ` AND ca.month = $${params.length + 1}`;
       params.push(Number(month));
     }
     if (status) {
-      query += ' AND ca.status = ?';
+      query += ` AND ca.status = $${params.length + 1}`;
       params.push(status);
     }
     if (userId) {
-      query += ' AND ca.user_id = ?';
+      query += ` AND ca.user_id = $${params.length + 1}`;
       params.push(userId);
     }
 
-    query += ' ORDER BY ca.year DESC, ca.month DESC LIMIT ? OFFSET ?';
+    query += ` ORDER BY ca.year DESC, ca.month DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(Number(limit), Number(offset));
 
-    const archives = await db.prepare(query).all(...params);
+    const archives = await db.all(query, params);
 
     // Get totals
     let totalsQuery = `
@@ -673,23 +674,23 @@ router.get('/commissions/archives', async (req, res) => {
     `;
     const totalsParams: any[] = [];
     if (year) {
-      totalsQuery += ' AND ca.year = ?';
+      totalsQuery += ` AND ca.year = $${totalsParams.length + 1}`;
       totalsParams.push(Number(year));
     }
     if (month) {
-      totalsQuery += ' AND ca.month = ?';
+      totalsQuery += ` AND ca.month = $${totalsParams.length + 1}`;
       totalsParams.push(Number(month));
     }
     if (status) {
-      totalsQuery += ' AND ca.status = ?';
+      totalsQuery += ` AND ca.status = $${totalsParams.length + 1}`;
       totalsParams.push(status);
     }
     if (userId) {
-      totalsQuery += ' AND ca.user_id = ?';
+      totalsQuery += ` AND ca.user_id = $${totalsParams.length + 1}`;
       totalsParams.push(userId);
     }
 
-    const totals = await db.prepare(totalsQuery).get(...totalsParams);
+    const totals = await db.get(totalsQuery, totalsParams);
 
     res.json({
       archives,
@@ -712,33 +713,33 @@ router.get('/commissions/by-staff', async (req, res) => {
     const targetMonth = month ? Number(month) : now.getMonth() + 1;
 
     // First try to get from archives
-    let archives = await db.prepare(`
+    let archives = await db.all(`
       SELECT ca.*, u.name as user_name
       FROM commission_archives ca
       LEFT JOIN users u ON ca.user_id = u.id
-      WHERE ca.year = ? AND ca.month = ?
+      WHERE ca.year = $1 AND ca.month = $2
       ORDER BY ca.commission_amount DESC
-    `).all(targetYear, targetMonth);
+    `, [targetYear, targetMonth]);
 
     // If no archives, calculate from operations
     if (archives.length === 0) {
       const startDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`;
       const endDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-31`;
 
-      const staffSales = await db.prepare(`
+      const staffSales = await db.all(`
         SELECT
           u.id as user_id,
           u.name as user_name,
           COALESCE(SUM(o.total_amount), 0) as total_sales
         FROM users u
         LEFT JOIN operations o ON u.id = o.created_by
-          AND o.created_at >= ? AND o.created_at <= ?
+          AND o.created_at >= $1 AND o.created_at <= $2
           AND o.status = 'completed'
         WHERE u.role IN ('staff', 'manager')
         GROUP BY u.id, u.name
         HAVING total_sales > 0
         ORDER BY total_sales DESC
-      `).all(startDate, endDate);
+      `, [startDate, endDate]);
 
       archives = staffSales.map((staff: any) => {
         const tier = getCommissionTier(staff.total_sales);
@@ -773,22 +774,22 @@ router.get('/commissions/trends', async (req, res) => {
       const year = d.getFullYear();
       const month = d.getMonth() + 1;
 
-      const archives = await db.prepare(`
+      const archives = await db.get(`
         SELECT
           COALESCE(SUM(commission_amount), 0) as total_commissions,
           COUNT(*) as staff_count
         FROM commission_archives
-        WHERE year = ? AND month = ?
-      `).get(year, month) as any;
+        WHERE year = $1 AND month = $2
+      `, [year, month]) as any;
 
-      const topPerformer = await db.prepare(`
+      const topPerformer = await db.get(`
         SELECT ca.*, u.name as user_name
         FROM commission_archives ca
         LEFT JOIN users u ON ca.user_id = u.id
-        WHERE ca.year = ? AND ca.month = ?
+        WHERE ca.year = $1 AND ca.month = $2
         ORDER BY ca.commission_amount DESC
         LIMIT 1
-      `).get(year, month) as any;
+      `, [year, month]) as any;
 
       trends.push({
         month: `${year}-${String(month).padStart(2, '0')}`,
@@ -834,24 +835,24 @@ router.post('/commissions/archive', async (req, res) => {
     const endDate = `${targetYear}-${String(targetMonth).padStart(2, '0')}-31`;
 
     // Get or create admin user for created_by
-    const adminUser = await db.prepare(`
+    const adminUser = await db.get(`
       SELECT id FROM users WHERE role = 'admin' LIMIT 1
-    `).get() as any;
+    `) as any;
     const createdBy = adminUser?.id || null;
 
     // Calculate commissions for each staff member
-    const staffCommissions = await db.prepare(`
+    const staffCommissions = await db.all(`
       SELECT
         u.id as user_id,
         u.name as user_name,
         COALESCE(SUM(o.total_amount), 0) as total_sales
       FROM users u
       LEFT JOIN operations o ON u.id = o.created_by
-        AND o.created_at >= ? AND o.created_at <= ?
+        AND o.created_at >= $1 AND o.created_at <= $2
         AND o.status = 'completed'
       WHERE u.role IN ('staff', 'manager')
       GROUP BY u.id, u.name
-    `).all(startDate, endDate);
+    `, [startDate, endDate]);
 
     const archives = [];
     for (const staff of staffCommissions) {
@@ -862,23 +863,23 @@ router.post('/commissions/archive', async (req, res) => {
       const archiveId = `ca_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       // Check if already exists
-      const existing = await db.prepare(`
-        SELECT id FROM commission_archives WHERE user_id = ? AND year = ? AND month = ?
-      `).get(staff.user_id, targetYear, targetMonth);
+      const existing = await db.get(`
+        SELECT id FROM commission_archives WHERE user_id = $1 AND year = $2 AND month = $3
+      `, [staff.user_id, targetYear, targetMonth]);
 
       if (existing) {
         // Update existing
-        await db.prepare(`
+        await db.run(`
           UPDATE commission_archives
-          SET total_sales = ?, commission_rate = ?, commission_amount = ?, archived_at = CURRENT_TIMESTAMP
-          WHERE user_id = ? AND year = ? AND month = ?
-        `).run(staff.total_sales, tier.rate, commissionAmount, staff.user_id, targetYear, targetMonth);
+          SET total_sales = $1, commission_rate = $2, commission_amount = $3, archived_at = CURRENT_TIMESTAMP
+          WHERE user_id = $4 AND year = $5 AND month = $6
+        `, [staff.total_sales, tier.rate, commissionAmount, staff.user_id, targetYear, targetMonth]);
       } else {
         // Insert new
-        await db.prepare(`
+        await db.run(`
           INSERT INTO commission_archives (id, user_id, year, month, total_sales, commission_rate, commission_amount, status, created_by)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-        `).run(archiveId, staff.user_id, targetYear, targetMonth, staff.total_sales, tier.rate, commissionAmount, createdBy);
+          VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8)
+        `, [archiveId, staff.user_id, targetYear, targetMonth, staff.total_sales, tier.rate, commissionAmount, createdBy]);
       }
 
       archives.push({
@@ -908,26 +909,26 @@ router.patch('/commissions/:id/mark-paid', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const archive = await db.prepare(`
-      SELECT * FROM commission_archives WHERE id = ?
-    `).get(id);
+    const archive = await db.get(`
+      SELECT * FROM commission_archives WHERE id = $1
+    `, [id]);
 
     if (!archive) {
       return res.status(404).json({ error: 'Commission archive not found' });
     }
 
-    await db.prepare(`
+    await db.run(`
       UPDATE commission_archives
       SET status = 'paid', paid_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(id);
+      WHERE id = $1
+    `, [id]);
 
-    const updated = await db.prepare(`
+    const updated = await db.get(`
       SELECT ca.*, u.name as user_name
       FROM commission_archives ca
       LEFT JOIN users u ON ca.user_id = u.id
-      WHERE ca.id = ?
-    `).get(id);
+      WHERE ca.id = $1
+    `, [id]);
 
     res.json({ success: true, archive: updated });
   } catch (error) {
