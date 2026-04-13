@@ -138,6 +138,7 @@ export const api = {
   ticket: {
     getNext: async (): Promise<string> => {
       const response = await fetch(`${API_URL}/ticket/next`);
+      if (!response.ok) throw new Error('Failed to fetch next ticket number');
       const data = await response.json();
       return data.ticket_number;
     },
