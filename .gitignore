@@ -27,5 +27,8 @@ dist-ssr
 *.db
 server/*.db
 
+# Worktrees
+.worktrees
+
 # Environment variables
 .env
