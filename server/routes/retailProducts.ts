@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   try {
     const products = await db.all(`
       SELECT * FROM retail_products
-      WHERE is_active = 1
+      WHERE is_active = true
       ORDER BY display_order ASC, name ASC
     `);
     res.json(products);
@@ -26,7 +26,7 @@ router.get('/categories', async (req, res) => {
     const categories = await db.all(`
       SELECT DISTINCT category
       FROM retail_products
-      WHERE is_active = 1
+      WHERE is_active = true
       ORDER BY category
     `);
     res.json(categories.map((c: any) => c.category));
@@ -42,7 +42,7 @@ router.get('/category/:category', async (req, res) => {
     const { category } = req.params;
     const products = await db.all(`
       SELECT * FROM retail_products
-      WHERE is_active = 1 AND category = $1
+      WHERE is_active = true AND category = $1
       ORDER BY display_order ASC, name ASC
     `, [category]);
     res.json(products);
@@ -68,7 +68,7 @@ router.post('/', authenticateToken, requireRole('admin'), async (req, res) => {
       INSERT INTO retail_products (
         id, name, category, description, default_price, icon, display_order, image_url,
         is_active, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, $10)
     `, [
       id,
       name,
@@ -153,8 +153,8 @@ router.delete('/:id', authenticateToken, requireRole('admin'), async (req, res) 
 
     const result = await db.run(`
       UPDATE retail_products
-      SET is_active = 0, updated_at = $1
-      WHERE id = $2 AND is_active = 1
+      SET is_active = false, updated_at = $1
+      WHERE id = $2 AND is_active = true
     `, [now, id]);
 
     if ((result as any).rowCount > 0) {
