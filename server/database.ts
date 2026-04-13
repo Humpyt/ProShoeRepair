@@ -5,6 +5,7 @@ export const pool = new Pool({
   port: 5432,
   database: 'cavemo-repair',
   user: 'postgres',
+  password: 'postgres123',
   max: 20,
   idleTimeoutMillis: 30000,
 });
