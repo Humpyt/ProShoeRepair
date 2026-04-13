@@ -385,7 +385,6 @@ export default function DropPage() {
 
   const handleAddCustomer = async (customerData: Omit<Customer, 'id' | 'totalOrders' | 'totalSpent' | 'lastVisit' | 'loyaltyPoints'>) => {
     try {
-      // Don't generate ID here - let the API generate it
       const customerToSave = {
         ...customerData,
         totalOrders: 0,
@@ -394,30 +393,10 @@ export default function DropPage() {
         loyaltyPoints: 0,
       };
 
-      // The CustomerContext.addCustomer will return the created customer with the DB-generated ID
-      // But we need to work around the current API structure
-      const response = await fetch(API_ENDPOINTS.customers, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(customerToSave),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create customer');
-      }
-
-      const newCustomer = await response.json();
+      const newCustomer = await addCustomer(customerToSave);
       setSelectedCustomer(newCustomer);
       setIsCustomerModalOpen(false);
-
-      // Refresh the customer list
-      fetch(API_ENDPOINTS.customers)
-        .then(r => r.json())
-        .then(data => {
-          // Update context by re-fetching
-          setCustomerSearchTerm('');
-        })
-        .catch(console.error);
+      setCustomerSearchTerm('');
 
     } catch (error) {
       console.error('Error adding customer:', error);

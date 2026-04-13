@@ -36,11 +36,12 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  const addCustomer = async (customerData: Omit<Customer, 'id'>) => {
+  const addCustomer = async (customerData: Omit<Customer, 'id'>): Promise<Customer> => {
     try {
       setError(null);
       const newCustomer = await api.customers.create(customerData);
       setCustomers(prev => [...prev, newCustomer]);
+      return newCustomer;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add customer');
       throw err;
