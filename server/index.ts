@@ -69,13 +69,15 @@ app.get('/api/customers', async (req, res) => {
 
     let query = `SELECT * FROM customers`;
     const params: any[] = [];
+    let paramIndex = 1;
 
     if (search) {
-      query += ` WHERE name LIKE $1 OR phone LIKE $2`;
+      query += ` WHERE name LIKE $${paramIndex} OR phone LIKE $${paramIndex + 1}`;
       params.push(`%${search}%`, `%${search}%`);
+      paramIndex += 2;
     }
 
-    query += ` ORDER BY name ASC LIMIT $3 OFFSET $4`;
+    query += ` ORDER BY name ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
     const customers = await db.all(query, params);
