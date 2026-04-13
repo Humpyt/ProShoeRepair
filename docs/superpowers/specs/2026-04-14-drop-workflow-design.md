@@ -26,10 +26,10 @@ A **ticket number** is assigned at the moment a drop is created — one ticket p
 **Cascade Logic (fields enable as previous steps complete):**
 
 ```
-Customer → Category → Color → Brand → Material → Memo → Service → Service Variations
+Customer → Category → Color → Brand → Material → Short Description → Memo → Service → Service Variations
 ```
 
-Memo and Material are parallel — either can be selected independently. Service → Service Variations is sequential.
+Memo appears after Short Description. Service → Service Variations is sequential.
 
 **Field Behavior:**
 - Each field appears as a **dropdown/search-select**
@@ -66,22 +66,27 @@ Memo and Material are parallel — either can be selected independently. Service
 │  │ Search brand... ▼        │  │  └──────────────────────────┘  │
 │  └──────────────────────────┘  │                                │
 │                                │  ─────────────────────────────  │
-│  STEP 5A: Material            │  TOTAL:  UGX 0                  │
+│  STEP 5: Material            │  TOTAL:  UGX 0                  │
 │  ┌──────────────────────────┐  │  [COMPLETE DROP]               │
 │  │ Select Material ▼        │  │                                │
 │  └──────────────────────────┘  │                                │
 │                                │                                │
-│  STEP 5B: Memo                │                                │
+│  STEP 6: Short Description    │                                │
+│  ┌──────────────────────────┐  │                                │
+│  │ (optional free text)     │  │                                │
+│  └──────────────────────────┘  │                                │
+│                                │                                │
+│  STEP 7: Memo (multi-select)  │                                │
 │  ┌──────────────────────────┐  │                                │
 │  │ Select Memo ▼            │  │                                │
 │  └──────────────────────────┘  │                                │
 │                                │                                │
-│  STEP 6: Service              │                                │
+│  STEP 8: Service              │                                │
 │  ┌──────────────────────────┐  │                                │
 │  │ Select Service ▼         │  │                                │
 │  └──────────────────────────┘  │                                │
 │                                │                                │
-│  STEP 7: Service Variations   │                                │
+│  STEP 9: Service Variations   │                                │
 │  ┌──────────────────────────┐  │                                │
 │  │ Select Variation ▼       │  │                                │
 │  └──────────────────────────┘  │                                │
@@ -134,7 +139,7 @@ Each cart item renders as:
 
 ```
 Women's High Heel
-Black, Byblos, Delicate, Special Attention, Fabric, CGGG
+Black, Byblos, Fabric, CGGG, Delicate, Special Attention
 Elastic - New Left
 ────────────────────
 UGX 50,000
@@ -142,10 +147,12 @@ UGX 50,000
 
 **Format breakdown:**
 - Line 1: Category
-- Line 2: Color, Brand, [all selected Memos comma-separated], Material, [brand initials/acronym — first 4 letters of brand]
+- Line 2: Color, Brand, Material, [Short Description], [all selected Memos comma-separated]
 - Line 3: [Service] - [Service Variation]
 - Line 4: ────────────────────
 - Line 5: UGX [price]
+
+Note: Short Description (e.g., "CGGG", "rush job") is optional free text entered by the user, placed before Memos on Line 2.
 
 **When multiple services on same shoe:** each service appears on its own line within the same item block.
 
@@ -208,7 +215,8 @@ interface CartItem {
   color: string;
   brand: string;
   material: string;
-  memos: string[];          // multi-select
+  shortDescription: string;  // optional free text
+  memos: string[];         // multi-select
   services: {
     service: string;
     variation: string;
