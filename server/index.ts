@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
-import db from './database';
+import { pool } from './database';
+import { createSchema } from './db/postgres-schema';
+import { seedAll } from './db/postgres-seeds';
 import operationsRouter from './operations';
 import inventoryRouter from './routes/inventory';
 import printerRouter from './routes/printer';
@@ -352,12 +354,20 @@ app.get('/api/sales-items/category/:categoryId', async (req, res) => {
 // Start server
 app.listen(port, async () => {
   console.log(`Server is running on http://localhost:${port}`);
-  console.log('Database file:', (db as any).name);
+
+  // Initialize PostgreSQL schema and seed data
+  try {
+    await createSchema(pool);
+    await seedAll(pool);
+    console.log('Database initialized with schema and seed data');
+  } catch (error) {
+    console.error('Database initialization error:', error);
+  }
 
   // Test database connection
   try {
-    const customerCount = await db.prepare('SELECT COUNT(*) as count FROM customers').get();
-    console.log('Connected to database. Customer count:', customerCount?.count || 0);
+    const result = await pool.query('SELECT COUNT(*) as count FROM customers');
+    console.log('Connected to database. Customer count:', result.rows[0]?.count || 0);
   } catch (error) {
     console.error('Database connection error:', error);
   }
