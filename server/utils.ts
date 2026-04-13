@@ -1,5 +1,11 @@
 // Helper functions to transform data
 
+// Handle PostgreSQL boolean (true/false from JSON) vs SQLite integer (0/1)
+const toBool = (val: any): boolean => {
+  if (val === null || val === undefined) return false;
+  return val === true || val === 1 || val === 'true' || val === '1';
+};
+
 export const transformCustomer = (customer: any) => ({
     id: customer.id,
     name: customer.name,
@@ -27,10 +33,10 @@ export const transformOperation = (operation: any) => ({
     promisedDate: operation.promised_date || null,
     createdAt: operation.created_at,
     updatedAt: operation.updated_at,
-    isNoCharge: Boolean(operation.is_no_charge),
-    isDoOver: Boolean(operation.is_do_over),
-    isDelivery: Boolean(operation.is_delivery),
-    isPickup: Boolean(operation.is_pickup),
+    isNoCharge: toBool(operation.is_no_charge),
+    isDoOver: toBool(operation.is_do_over),
+    isDelivery: toBool(operation.is_delivery),
+    isPickup: toBool(operation.is_pickup),
     customer: operation.customer_id ? {
         id: operation.customer_id,
         name: operation.customer_name,
