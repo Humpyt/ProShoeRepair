@@ -67,12 +67,12 @@ app.get('/api/customers', async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const search = req.query.search as string;
 
-    let query = `SELECT * FROM customers`;
+    let query = `SELECT * FROM customers WHERE status = 'active'`;
     const params: any[] = [];
     let paramIndex = 1;
 
     if (search) {
-      query += ` WHERE name LIKE $${paramIndex} OR phone LIKE $${paramIndex + 1}`;
+      query += ` AND (name LIKE $${paramIndex} OR phone LIKE $${paramIndex + 1})`;
       params.push(`%${search}%`, `%${search}%`);
       paramIndex += 2;
     }
@@ -84,8 +84,8 @@ app.get('/api/customers', async (req, res) => {
 
     // Get total count for pagination
     const countQuery = search
-      ? `SELECT COUNT(*) as total FROM customers WHERE name LIKE $1 OR phone LIKE $2`
-      : `SELECT COUNT(*) as total FROM customers`;
+      ? `SELECT COUNT(*) as total FROM customers WHERE status = 'active' AND (name LIKE $1 OR phone LIKE $2)`
+      : `SELECT COUNT(*) as total FROM customers WHERE status = 'active'`;
     const countParams = search ? [`%${search}%`, `%${search}%`] : [];
     const { total } = await db.get(countQuery, countParams);
 
