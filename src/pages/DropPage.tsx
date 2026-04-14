@@ -86,9 +86,9 @@ const SERVICE_VARIATIONS = [
   "New Left", "New Pair", "New Right", "Shorten Left", "Shorten Pair", "Shorten Right"
 ];
 
-type StepName = 'customer' | 'category' | 'color' | 'brand' | 'material' | 'description' | 'memos' | 'service' | 'variation' | 'price';
+type StepName = 'customer' | 'category' | 'color' | 'brand' | 'material' | 'description' | 'memos' | 'service' | 'variation';
 
-const STEPS_ORDER: StepName[] = ['customer', 'category', 'color', 'brand', 'material', 'description', 'memos', 'service', 'variation', 'price'];
+const STEPS_ORDER: StepName[] = ['customer', 'category', 'color', 'brand', 'material', 'description', 'memos', 'service', 'variation'];
 
 // Helper to get initial form state
 const getInitialFormState = (): DropFormState => ({
@@ -117,6 +117,19 @@ export default function DropPage() {
   const [activeStep, setActiveStep] = useState<StepName>('customer');
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
 
+  // Compute preview item for real-time cart preview
+  const previewItem: CartItem | null = form.category ? {
+    id: 'preview',
+    category: form.category,
+    color: form.color,
+    brand: form.brand,
+    material: form.material,
+    shortDescription: form.shortDescription,
+    memos: form.memos,
+    services: form.service || form.variation ? [{ service: form.service, variation: form.variation }] : [],
+    price: parseInt(form.price, 10) || 0,
+  } : null;
+
   // Fetch ticket number and colors on mount
   useEffect(() => {
     setTicketLoading(true);
@@ -139,15 +152,15 @@ export default function DropPage() {
     fetchColors();
   }, []);
 
-  // Auto-add to cart when price is entered
+  // Auto-add to cart when price is entered (after variation is selected)
   useEffect(() => {
-    if (form.category && form.price && parseInt(form.price, 10) > 0) {
+    if (form.category && form.variation && form.price && parseInt(form.price, 10) > 0) {
       const timer = setTimeout(() => {
         handleAddToCart();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [form.price, form.category]);
+  }, [form.price, form.category, form.variation]);
 
   // Advance to next step
   const advanceStep = (currentStep: StepName) => {
@@ -321,7 +334,6 @@ export default function DropPage() {
       case 'memos': return form.memos.length > 0;
       case 'service': return Boolean(form.service);
       case 'variation': return Boolean(form.variation);
-      case 'price': return Boolean(form.price);
       default: return false;
     }
   };
@@ -338,7 +350,6 @@ export default function DropPage() {
       case 'memos': return form.memos.length > 0 ? form.memos.join(', ') : '(none)';
       case 'service': return form.service;
       case 'variation': return form.variation;
-      case 'price': return form.price ? formatCurrency(parseInt(form.price)) : '';
       default: return '';
     }
   };
@@ -355,7 +366,6 @@ export default function DropPage() {
       memos: '📋',
       service: '🔧',
       variation: '⚙️',
-      price: '💰',
     };
     return icons[step];
   };
@@ -587,28 +597,6 @@ export default function DropPage() {
           </div>
         );
 
-      case 'price':
-        return (
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-gray-400 mb-1.5 block">Enter Price (UGX)</label>
-              <input
-                type="number"
-                value={form.price}
-                onChange={(e) => handlePriceChange(e.target.value)}
-                placeholder="0"
-                className="w-full px-4 py-4 bg-gray-700 rounded-xl text-white text-2xl font-bold placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none"
-                autoFocus
-              />
-            </div>
-            {form.price && parseInt(form.price, 10) > 0 && (
-              <div className="text-center text-gray-400 text-sm">
-                Item will be added automatically...
-              </div>
-            )}
-          </div>
-        );
-
       default:
         return null;
     }
@@ -678,7 +666,7 @@ export default function DropPage() {
           {/* Stepper bars for completed steps */}
           <div className="flex gap-3 flex-wrap">
             {STEPS_ORDER.filter(step =>
-              step !== 'price' && isStepCompleted(step) && step !== activeStep
+              isStepCompleted(step) && step !== activeStep
             ).map(step => (
               <div key={step} className="flex-1 min-w-[180px]">
                 <CollapsedStep
@@ -712,6 +700,8 @@ export default function DropPage() {
             onRemoveItem={removeFromCart}
             onComplete={handleComplete}
             disabled={cartItems.length === 0}
+            previewItem={previewItem}
+            onPriceChange={(price) => setForm(prev => ({ ...prev, price: price.toString() }))}
           />
         </div>
       </div>
