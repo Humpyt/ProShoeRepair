@@ -279,6 +279,24 @@ export default function DropPage() {
     toast.success('Item added to cart');
   };
 
+  const handleDone = (item: CartItem) => {
+    addToCart(item);
+    setForm(prev => ({
+      ...prev,
+      category: '',
+      color: '',
+      brand: '',
+      material: '',
+      shortDescription: '',
+      memos: [],
+      service: '',
+      variation: '',
+      price: '',
+    }));
+    setActiveStep('category');
+    toast.success('Item added to cart');
+  };
+
   const handleEditCartItem = (item: CartItem) => {
     setEditingItem(item);
   };
@@ -707,6 +725,7 @@ export default function DropPage() {
             disabled={cartItems.length === 0}
             previewItem={previewItem}
             onPriceChange={(price) => setForm(prev => ({ ...prev, price: price.toString() }))}
+            onDone={handleDone}
           />
         </div>
       </div>
