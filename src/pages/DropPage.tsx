@@ -42,13 +42,18 @@ interface ColorOption {
 }
 
 const BRANDS = [
-  "Adidas", "AFS", "Air Jordan", "Albert Ferretti", "Albertino", "Alberto Fermani",
-  "Alberto Ferriti", "Aldo", "Alejandro Ingelmo", "Allen Edmunds", "ANAX",
-  "Andrew Marc", "Anne Klein", "Anyi Lu", "Aquatalia by Marvin K", "Armani",
-  "Armani Exchange", "Ash", "Australia Love Collective", "Bally", "Barney's",
-  "BASEMEN", "Bass", "BCBG Maxazria", "Bench", "Betsey Johnson", "Bettye Muller",
-  "Beverly Hills", "Boss", "Boutique 9", "Brooks", "Bruno Magli", "BRUNO MARC",
-  "BRUSQUE", "Burberry", "Bvlgari", "Byblos", "Calvin Klein", "Carlos Falchi"
+  // Top Shoe Brands
+  "Adidas", "Nike", "Jimmy Choo", "Christian Louboutin", "Manolo Blahnik",
+  "Gucci", "Prada", "Hermès", "Salvatore Ferragamo", "Cole Haan",
+  "Allen Edmonds", "Johnston Murphy", "Bostonian", "Florsheim", "Rockport",
+  "Clarks", "Ecco", "Clarks", "Timberland", "Dr. Martens",
+  "Vans", "Converse", "New Balance", "Puma", "Reebok",
+  // Top Bag Brands
+  "Louis Vuitton", "Chanel", "Hermès", "Gucci", "Prada", "Dior",
+  "Balenciaga", "Fendi", "Burberry", "Coach", "Michael Kors", "Kate Spade",
+  "Tory Burch", "Rebecca Minkoff", "Marc Jacobs", "Tumi", "Longchamp",
+  // Local/Other
+  "Other"
 ];
 
 const MATERIALS = [
@@ -171,7 +176,9 @@ export default function DropPage() {
 
   const handleCategorySelect = (category: string) => {
     setForm(prev => ({ ...prev, category }));
-    advanceStep('category');
+    if (category !== 'Other') {
+      advanceStep('category');
+    }
   };
 
   const handleColorSelect = (color: string) => {
@@ -181,7 +188,9 @@ export default function DropPage() {
 
   const handleBrandSelect = (brand: string) => {
     setForm(prev => ({ ...prev, brand }));
-    advanceStep('brand');
+    if (brand !== 'Other') {
+      advanceStep('brand');
+    }
   };
 
   const handleMaterialSelect = (material: string) => {
@@ -415,21 +424,45 @@ export default function DropPage() {
 
       case 'category':
         return (
-          <div className="grid grid-cols-3 gap-2">
-            {CATEGORIES.map(cat => (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.name}
+                  onClick={() => handleCategorySelect(cat.name)}
+                  className={`p-3 rounded-xl text-sm font-medium transition-all ${
+                    form.category === cat.name
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  }`}
+                >
+                  <span className="text-lg mr-1">{cat.icon}</span>
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+            {form.category === 'Other' && (
+              <input
+                type="text"
+                placeholder="Enter custom category..."
+                autoFocus
+                className="w-full px-4 py-3 bg-gray-700 rounded-xl text-white placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none"
+                onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && form.category && form.category !== 'Other') {
+                    advanceStep('category');
+                  }
+                }}
+              />
+            )}
+            {form.category && form.category !== 'Other' && (
               <button
-                key={cat.name}
-                onClick={() => handleCategorySelect(cat.name)}
-                className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                  form.category === cat.name
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-                }`}
+                onClick={() => advanceStep('category')}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
               >
-                <span className="text-lg mr-1">{cat.icon}</span>
-                {cat.name}
+                Continue
               </button>
-            ))}
+            )}
           </div>
         );
 
@@ -462,20 +495,44 @@ export default function DropPage() {
 
       case 'brand':
         return (
-          <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
-            {BRANDS.map(brand => (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
+              {BRANDS.map(brand => (
+                <button
+                  key={brand}
+                  onClick={() => handleBrandSelect(brand)}
+                  className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                    form.brand === brand
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  }`}
+                >
+                  {brand}
+                </button>
+              ))}
+            </div>
+            {form.brand === 'Other' && (
+              <input
+                type="text"
+                placeholder="Enter custom brand..."
+                autoFocus
+                className="w-full px-4 py-3 bg-gray-700 rounded-xl text-white placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none"
+                onChange={(e) => setForm(prev => ({ ...prev, brand: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && form.brand && form.brand !== 'Other') {
+                    advanceStep('brand');
+                  }
+                }}
+              />
+            )}
+            {form.brand && form.brand !== 'Other' && (
               <button
-                key={brand}
-                onClick={() => handleBrandSelect(brand)}
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
-                  form.brand === brand
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-                }`}
+                onClick={() => advanceStep('brand')}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
               >
-                {brand}
+                Continue
               </button>
-            ))}
+            )}
           </div>
         );
 
