@@ -683,22 +683,15 @@ export default function DropPage() {
 
           {/* Stepper pills for completed steps */}
           {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
-              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep)
-                .slice(0, 4) // Show max 4 pills
-                .map(step => (
-                  <PillChip
-                    key={step}
-                    icon={getStepIcon(step)}
-                    value={getStepValue(step)}
-                    onEdit={() => editStep(step)}
-                  />
+            <div className="flex flex-wrap gap-2 pb-1">
+              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).map(step => (
+                <PillChip
+                  key={step}
+                  icon={getStepIcon(step)}
+                  value={getStepValue(step)}
+                  onEdit={() => editStep(step)}
+                />
               ))}
-              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length > 4 && (
-                <span className="text-gray-400 text-sm px-2">
-                  +{STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length - 4}
-                </span>
-              )}
             </div>
           )}
 
