@@ -694,11 +694,17 @@ export default function DropPage() {
         </div>
 
         {/* Right sidebar - Cart Summary */}
-        <div className="w-96 flex-shrink-0">
+        <div className="w-[480px] flex-shrink-0">
           <CartSummary
             items={cartItems}
             ticketNumber={ticketNumber}
             onRemoveItem={removeFromCart}
+            onUpdateItemPrice={(id, price) => {
+              const item = cartItems.find(i => i.id === id);
+              if (item) {
+                updateCartItem?.(id, { ...item, price });
+              }
+            }}
             onComplete={handleComplete}
             disabled={cartItems.length === 0}
             previewItem={previewItem}

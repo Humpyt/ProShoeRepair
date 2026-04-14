@@ -1,13 +1,13 @@
-import React from 'react';
-import { ShoppingCart, Check, Package, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, Check, Package, Sparkles, Trash2 } from 'lucide-react';
 import { CartItem as CartItemType } from '../../types';
-import CartItemCard from './CartItemCard';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 interface CartSummaryProps {
   items: CartItemType[];
   ticketNumber: string;
   onRemoveItem: (id: string) => void;
+  onUpdateItemPrice: (id: string, price: number) => void;
   onComplete: () => void;
   disabled?: boolean;
   previewItem?: CartItemType | null;
@@ -15,10 +15,96 @@ interface CartSummaryProps {
   onDone?: (item: CartItemType) => void;
 }
 
+interface CartItemRowProps {
+  item: CartItemType;
+  index: number;
+  onRemove: (id: string) => void;
+  onUpdatePrice: (id: string, price: number) => void;
+}
+
+const CartItemRow: React.FC<CartItemRowProps> = ({ item, index, onRemove, onUpdatePrice }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editPrice, setEditPrice] = useState(item.price.toString());
+
+  const handlePriceClick = () => {
+    setEditPrice(item.price.toString());
+    setIsEditing(true);
+  };
+
+  const handlePriceBlur = () => {
+    const newPrice = parseInt(editPrice, 10);
+    if (!isNaN(newPrice) && newPrice >= 0) {
+      onUpdatePrice(item.id, newPrice);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handlePriceBlur();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditPrice(item.price.toString());
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 hover:bg-gray-100 transition-colors">
+      {/* Left: Icon */}
+      <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+        {item.photoUrl ? (
+          <img src={item.photoUrl} alt="" className="w-full h-full object-cover rounded-lg" />
+        ) : (
+          <Package className="w-5 h-5 text-gray-400" />
+        )}
+      </div>
+
+      {/* Center: Category, details, service */}
+      <div className="flex-1 min-w-0">
+        <div className="font-bold text-gray-800 text-sm truncate">{item.category}</div>
+        <div className="text-gray-500 text-xs truncate">{item.details || item.description}</div>
+        {item.service && <div className="text-indigo-600 text-xs mt-0.5 truncate">{item.service}</div>}
+      </div>
+
+      {/* Right: Index, editable price, delete */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <span className="text-gray-300 text-xs font-medium">#{index + 1}</span>
+
+        {isEditing ? (
+          <input
+            type="number"
+            value={editPrice}
+            onChange={(e) => setEditPrice(e.target.value)}
+            onBlur={handlePriceBlur}
+            onKeyDown={handleKeyDown}
+            className="w-24 px-2 py-1 text-sm font-bold text-right border-2 border-indigo-400 rounded-lg focus:outline-none focus:border-indigo-600"
+            autoFocus
+          />
+        ) : (
+          <button
+            onClick={handlePriceClick}
+            className="px-3 py-1 font-bold text-gray-800 bg-white border-2 border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 transition-colors min-w-[80px] text-right"
+          >
+            {formatCurrency(item.price)}
+          </button>
+        )}
+
+        <button
+          onClick={() => onRemove(item.id)}
+          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const CartSummary: React.FC<CartSummaryProps> = ({
   items,
   ticketNumber,
   onRemoveItem,
+  onUpdateItemPrice,
   onComplete,
   disabled = false,
   previewItem = null,
@@ -61,11 +147,21 @@ const CartSummary: React.FC<CartSummaryProps> = ({
               </div>
               <span className="text-indigo-600 font-semibold text-sm">Now Building</span>
             </div>
-            <CartItemCard
-              item={previewItem}
-              onEdit={() => {}}
-              onRemove={() => {}}
-            />
+            <div className="bg-white rounded-xl p-3 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                  {previewItem.photoUrl ? (
+                    <img src={previewItem.photoUrl} alt="" className="w-full h-full object-cover rounded-lg" />
+                  ) : (
+                    <Package className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-gray-800 text-sm truncate">{previewItem.category}</div>
+                  <div className="text-gray-500 text-xs truncate">{previewItem.details || previewItem.description}</div>
+                </div>
+              </div>
+            </div>
             <div className="mt-3 pt-3 border-t border-indigo-200">
               <label className="text-xs text-indigo-600 font-medium mb-1.5 block">Set Price (UGX)</label>
               <div className="flex gap-2">
@@ -95,13 +191,14 @@ const CartSummary: React.FC<CartSummaryProps> = ({
         {items.length > 0 && (
           <div>
             <h4 className="text-gray-500 font-semibold text-xs uppercase mb-2">Items</h4>
-            <div className="space-y-3">
-              {items.map((item) => (
-                <CartItemCard
+            <div className="space-y-2">
+              {items.map((item, index) => (
+                <CartItemRow
                   key={item.id}
                   item={item}
-                  onEdit={() => {}}
+                  index={index}
                   onRemove={onRemoveItem}
+                  onUpdatePrice={onUpdateItemPrice}
                 />
               ))}
             </div>
