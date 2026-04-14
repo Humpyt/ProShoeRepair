@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, X, User, Pencil } from 'lucide-react';
+import { Search, Plus, X, User, Pencil, Check } from 'lucide-react';
 import { useOperation } from '../contexts/OperationContext';
 import { useCustomer } from '../contexts/CustomerContext';
 import type { Customer, CartItem, DropFormState } from '../types';
@@ -597,6 +597,42 @@ export default function DropPage() {
                 </button>
               ))}
             </div>
+            {form.variation && (
+              <button
+                onClick={() => {
+                  const item: CartItem = {
+                    id: crypto.randomUUID(),
+                    category: form.category,
+                    color: form.color,
+                    brand: form.brand,
+                    material: form.material,
+                    shortDescription: form.shortDescription,
+                    memos: form.memos,
+                    services: [{ service: form.service, variation: form.variation }],
+                    price: 0,
+                  };
+                  addToCart(item);
+                  toast.success('Item added to cart!');
+                  setForm(prev => ({
+                    ...prev,
+                    category: '',
+                    color: prev.color,
+                    brand: prev.brand,
+                    material: '',
+                    shortDescription: '',
+                    memos: [],
+                    service: '',
+                    variation: '',
+                    price: '',
+                  }));
+                  setActiveStep('category');
+                }}
+                className="w-full py-4 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition-all bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-lg"
+              >
+                <Check className="w-5 h-5" />
+                DONE
+              </button>
+            )}
           </div>
         );
 
