@@ -3,7 +3,7 @@ import { Search, Plus, X, User, Pencil } from 'lucide-react';
 import { useOperation } from '../contexts/OperationContext';
 import { useCustomer } from '../contexts/CustomerContext';
 import type { Customer, CartItem, DropFormState } from '../types';
-import CollapsedStep from '../components/drop/CollapsedStep';
+import PillChip from '../components/drop/PillChip';
 import StepSection from '../components/drop/StepSection';
 import CartItemCard from '../components/drop/CartItemCard';
 import EditItemModal from '../components/drop/EditItemModal';
@@ -663,21 +663,26 @@ export default function DropPage() {
             </div>
           )}
 
-          {/* Stepper bars for completed steps */}
-          <div className="flex gap-3 flex-wrap">
-            {STEPS_ORDER.filter(step =>
-              isStepCompleted(step) && step !== activeStep
-            ).map(step => (
-              <div key={step} className="flex-1 min-w-[180px]">
-                <CollapsedStep
-                  icon={getStepIcon(step)}
-                  label={step.charAt(0).toUpperCase() + step.slice(1)}
-                  value={getStepValue(step)}
-                  onEdit={() => editStep(step)}
-                />
-              </div>
-            ))}
-          </div>
+          {/* Stepper pills for completed steps */}
+          {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep)
+                .slice(0, 4) // Show max 4 pills
+                .map(step => (
+                  <PillChip
+                    key={step}
+                    icon={getStepIcon(step)}
+                    value={getStepValue(step)}
+                    onEdit={() => editStep(step)}
+                  />
+              ))}
+              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length > 4 && (
+                <span className="text-gray-400 text-sm px-2">
+                  +{STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length - 4}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Active form section */}
           <div className="flex-1 overflow-y-auto">
