@@ -723,31 +723,35 @@ export default function DropPage() {
       <div className="flex gap-4 flex-1 overflow-hidden">
         {/* Left side */}
         <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-          {/* Stepper pills for completed steps */}
-          {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length > 0 && (
-            <div className="flex flex-wrap gap-2 pb-1">
-              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).map(step => (
-                <PillChip
-                  key={step}
-                  icon={getStepIcon(step)}
-                  value={getStepValue(step)}
-                  onEdit={() => editStep(step)}
-                />
-              ))}
-            </div>
-          )}
+          {!showProducts && (
+            <>
+              {/* Stepper pills for completed steps */}
+              {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).length > 0 && (
+                <div className="flex flex-wrap gap-2 pb-1">
+                  {STEPS_ORDER.filter(step => isStepCompleted(step) && step !== activeStep).map(step => (
+                    <PillChip
+                      key={step}
+                      icon={getStepIcon(step)}
+                      value={getStepValue(step)}
+                      onEdit={() => editStep(step)}
+                    />
+                  ))}
+                </div>
+              )}
 
-          {/* Active form section */}
-          <div className="flex-1 overflow-y-auto">
-            <StepSection
-              title={activeStep.charAt(0).toUpperCase() + activeStep.slice(1)}
-              icon={getStepIcon(activeStep)}
-              color="border-t-indigo-500"
-              isActive={true}
-            >
-              {renderStepForm()}
-            </StepSection>
-          </div>
+              {/* Active form section */}
+              <div className="flex-1 overflow-y-auto">
+                <StepSection
+                  title={activeStep.charAt(0).toUpperCase() + activeStep.slice(1)}
+                  icon={getStepIcon(activeStep)}
+                  color="border-t-indigo-500"
+                  isActive={true}
+                >
+                  {renderStepForm()}
+                </StepSection>
+              </div>
+            </>
+          )}
 
           {/* Products Toggle */}
           <div className="flex-shrink-0">
@@ -773,7 +777,7 @@ export default function DropPage() {
           </div>
 
           {/* Service shortcuts - fixed at bottom */}
-          {activeStep !== 'customer' && (
+          {activeStep !== 'customer' && !showProducts && (
             <div className="flex-shrink-0 py-3 space-y-2 border-t border-gray-700">
               <div className="grid grid-cols-4 gap-2">
                 {['Clean', 'Dye', 'Waterproof', 'Shine'].map(service => (
