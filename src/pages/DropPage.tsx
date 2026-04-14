@@ -1,26 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, X, User } from 'lucide-react';
+import { Search, Plus, X, User, Pencil } from 'lucide-react';
 import { useOperation } from '../contexts/OperationContext';
 import { useCustomer } from '../contexts/CustomerContext';
 import type { Customer, CartItem, DropFormState } from '../types';
-import CascadeSelect from '../components/drop/CascadeSelect';
-import MemoSelect from '../components/drop/MemoSelect';
-import PriceInput from '../components/drop/PriceInput';
-import TicketBadge from '../components/drop/TicketBadge';
+import CollapsedStep from '../components/drop/CollapsedStep';
+import StepSection from '../components/drop/StepSection';
+import CartItemCard from '../components/drop/CartItemCard';
+import EditItemModal from '../components/drop/EditItemModal';
 import CartSummary from '../components/drop/CartSummary';
+import TicketBadge from '../components/drop/TicketBadge';
 import { formatCurrency } from '../utils/formatCurrency';
 import toast from 'react-hot-toast';
 
-// Fixed data from design spec
-const CATEGORIES = [
-  "Women's High Heel", "Men's Dress Shoe", "Men's Casual", "Women's Flat",
-  "Children's", "Sandal", "Boot", "Loafer", "Slipper"
+// Item categories with icons
+interface ItemCategory {
+  id: string;
+  name: string;
+  icon: string;
+}
+
+const CATEGORIES: ItemCategory[] = [
+  { id: 'womens-high-heel', name: "Women's High Heel", icon: '👠' },
+  { id: 'womens-flat', name: "Women's Flat", icon: '🥿' },
+  { id: 'womens-dress-boot', name: "Women's Dress Boot", icon: '👢' },
+  { id: 'womens-sneaker', name: "Women's Sneaker", icon: '👟' },
+  { id: 'mens-dress', name: "Men's Dress", icon: '👞' },
+  { id: 'mens-half-boot', name: "Men's Half Boot", icon: '🥾' },
+  { id: 'mens-sneaker', name: "Men's Sneaker", icon: '👟' },
+  { id: 'mens-work', name: "Men's Work", icon: '🥾' },
+  { id: 'mens-western', name: "Men's Western", icon: '👢' },
+  { id: 'mens-riding', name: "Men's Riding", icon: '🥾' },
+  { id: 'bag', name: "Bag", icon: '👜' },
+  { id: 'other', name: "Other", icon: '🔧' }
 ];
 
-const COLORS = [
-  "Black", "Brown", "White", "Red", "Blue", "Navy", "Tan", "Grey",
-  "Pink", "Purple", "Gold", "Silver", "Beige", "Green", "Orange"
-];
+// Color option interface
+interface ColorOption {
+  id: string;
+  name: string;
+  hexCode: string;
+  isRainbow?: boolean;
+}
 
 const BRANDS = [
   "Adidas", "AFS", "Air Jordan", "Albert Ferretti", "Albertino", "Alberto Fermani",
@@ -44,16 +64,34 @@ const MEMOS = [
 ];
 
 const SERVICES = [
-  "Elastic", "Glue", "Hardware", "Heel", "Heel Fix", "Insoles", "Misc",
-  "Pad", "Patches", "Rips", "Sling", "Stitch", "Straps", "Stretch",
-  "Tassels", "Zipper"
+  { name: "Elastic", estimatedPrice: 15000 },
+  { name: "Glue", estimatedPrice: 10000 },
+  { name: "Hardware", estimatedPrice: 20000 },
+  { name: "Heel", estimatedPrice: 25000 },
+  { name: "Heel Fix", estimatedPrice: 30000 },
+  { name: "Insoles", estimatedPrice: 20000 },
+  { name: "Misc", estimatedPrice: 15000 },
+  { name: "Pad", estimatedPrice: 12000 },
+  { name: "Patches", estimatedPrice: 25000 },
+  { name: "Rips", estimatedPrice: 20000 },
+  { name: "Sling", estimatedPrice: 15000 },
+  { name: "Stitch", estimatedPrice: 20000 },
+  { name: "Straps", estimatedPrice: 18000 },
+  { name: "Stretch", estimatedPrice: 20000 },
+  { name: "Tassels", estimatedPrice: 15000 },
+  { name: "Zipper", estimatedPrice: 25000 }
 ];
 
 const SERVICE_VARIATIONS = [
   "New Left", "New Pair", "New Right", "Shorten Left", "Shorten Pair", "Shorten Right"
 ];
 
-const initialFormState: DropFormState = {
+type StepName = 'customer' | 'category' | 'color' | 'brand' | 'material' | 'description' | 'memos' | 'service' | 'variation' | 'price';
+
+const STEPS_ORDER: StepName[] = ['customer', 'category', 'color', 'brand', 'material', 'description', 'memos', 'service', 'variation', 'price'];
+
+// Helper to get initial form state
+const getInitialFormState = (): DropFormState => ({
   customerId: '',
   category: '',
   color: '',
@@ -64,56 +102,142 @@ const initialFormState: DropFormState = {
   service: '',
   variation: '',
   price: '',
-};
+});
 
 export default function DropPage() {
-  const { cartItems, addToCart, removeFromCart, clearCart, ticketNumber, fetchTicketNumber } = useOperation();
+  const { cartItems, addToCart, removeFromCart, clearCart, updateCartItem, ticketNumber, fetchTicketNumber } = useOperation();
   const { customers, addCustomer } = useCustomer();
 
-  const [form, setForm] = useState<DropFormState>(initialFormState);
+  const [form, setForm] = useState<DropFormState>(getInitialFormState());
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [showCustomerSearch, setShowCustomerSearch] = useState(false);
   const [ticketLoading, setTicketLoading] = useState(false);
+  const [colors, setColors] = useState<ColorOption[]>([]);
+  const [activeStep, setActiveStep] = useState<StepName>('customer');
+  const [editingItem, setEditingItem] = useState<CartItem | null>(null);
 
-  // Fetch ticket number on mount
+  // Fetch ticket number and colors on mount
   useEffect(() => {
     setTicketLoading(true);
     fetchTicketNumber().finally(() => setTicketLoading(false));
   }, [fetchTicketNumber]);
 
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
-    c.phone.includes(customerSearchTerm) ||
-    c.email?.toLowerCase().includes(customerSearchTerm.toLowerCase())
-  );
+  // Fetch colors from API
+  useEffect(() => {
+    const fetchColors = async () => {
+      try {
+        const response = await fetch('/api/colors');
+        if (response.ok) {
+          const data = await response.json();
+          setColors(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch colors:', error);
+      }
+    };
+    fetchColors();
+  }, []);
 
-  // Cascade field enable/disable logic
-  const customerLocked = Boolean(form.customerId);
-  const categoryLocked = Boolean(form.category);
-  const colorLocked = Boolean(form.color);
-  const brandLocked = Boolean(form.brand);
-  const materialLocked = Boolean(form.material);
-  const memosLocked = false; // memos don't lock
-  const serviceLocked = Boolean(form.service);
-  const variationLocked = Boolean(form.variation);
-  const priceLocked = false; // price doesn't lock
+  // Auto-add to cart when price is entered
+  useEffect(() => {
+    if (form.category && form.price && parseInt(form.price, 10) > 0) {
+      const timer = setTimeout(() => {
+        handleAddToCart();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [form.price, form.category]);
+
+  // Advance to next step
+  const advanceStep = (currentStep: StepName) => {
+    const currentIndex = STEPS_ORDER.indexOf(currentStep);
+    if (currentIndex < STEPS_ORDER.length - 1) {
+      setActiveStep(STEPS_ORDER[currentIndex + 1]);
+    }
+  };
+
+  // Edit a collapsed step - resets subsequent steps
+  const editStep = (step: StepName) => {
+    setForm(prev => {
+      const stepIndex = STEPS_ORDER.indexOf(step);
+      // Clear all steps after this one
+      return {
+        ...prev,
+        color: stepIndex >= STEPS_ORDER.indexOf('color') ? prev.color : '',
+        brand: stepIndex >= STEPS_ORDER.indexOf('brand') ? prev.brand : '',
+        material: stepIndex >= STEPS_ORDER.indexOf('material') ? prev.material : '',
+        shortDescription: stepIndex >= STEPS_ORDER.indexOf('description') ? prev.shortDescription : '',
+        memos: stepIndex >= STEPS_ORDER.indexOf('memos') ? prev.memos : [],
+        service: stepIndex >= STEPS_ORDER.indexOf('service') ? prev.service : '',
+        variation: stepIndex >= STEPS_ORDER.indexOf('variation') ? prev.variation : '',
+        price: stepIndex >= STEPS_ORDER.indexOf('price') ? prev.price : '',
+      };
+    });
+    setActiveStep(step);
+  };
 
   const handleCustomerSelect = (customer: Customer) => {
     setSelectedCustomer(customer);
     setForm(prev => ({ ...prev, customerId: customer.id }));
     setShowCustomerSearch(false);
     setCustomerSearchTerm('');
+    advanceStep('customer');
   };
 
-  const handleCustomerClear = () => {
-    setSelectedCustomer(null);
-    setForm(prev => ({ ...prev, customerId: '' }));
+  const handleCategorySelect = (category: string) => {
+    setForm(prev => ({ ...prev, category }));
+    advanceStep('category');
+  };
+
+  const handleColorSelect = (color: string) => {
+    setForm(prev => ({ ...prev, color }));
+    advanceStep('color');
+  };
+
+  const handleBrandSelect = (brand: string) => {
+    setForm(prev => ({ ...prev, brand }));
+    advanceStep('brand');
+  };
+
+  const handleMaterialSelect = (material: string) => {
+    setForm(prev => ({ ...prev, material }));
+    advanceStep('material');
+  };
+
+  const handleDescriptionChange = (value: string) => {
+    setForm(prev => ({ ...prev, shortDescription: value }));
+  };
+
+  const handleMemoToggle = (memo: string) => {
+    setForm(prev => {
+      const newMemos = prev.memos.includes(memo)
+        ? prev.memos.filter(m => m !== memo)
+        : [...prev.memos, memo];
+      return { ...prev, memos: newMemos };
+    });
+  };
+
+  const handleMemoContinue = () => {
+    advanceStep('memos');
+  };
+
+  const handleServiceSelect = (service: string) => {
+    setForm(prev => ({ ...prev, service }));
+    advanceStep('service');
+  };
+
+  const handleVariationSelect = (variation: string) => {
+    setForm(prev => ({ ...prev, variation }));
+    advanceStep('variation');
+  };
+
+  const handlePriceChange = (value: string) => {
+    setForm(prev => ({ ...prev, price: value }));
   };
 
   const handleAddToCart = () => {
     if (!form.category || !form.price) return;
-
     const item: CartItem = {
       id: crypto.randomUUID(),
       category: form.category,
@@ -125,12 +249,12 @@ export default function DropPage() {
       services: [{ service: form.service, variation: form.variation }],
       price: parseInt(form.price, 10) || 0,
     };
-
     addToCart(item);
-
-    // Reset form below brand: keep customerId, category, color, brand, clear rest
     setForm(prev => ({
       ...prev,
+      category: '',
+      color: '',
+      brand: '',
       material: '',
       shortDescription: '',
       memos: [],
@@ -138,34 +262,31 @@ export default function DropPage() {
       variation: '',
       price: '',
     }));
-
+    setActiveStep('category');
     toast.success('Item added to cart');
   };
 
-  const handleComplete = async () => {
-    if (!ticketNumber) return;
-    if (!selectedCustomer) {
-      toast.error('Please select a customer');
-      return;
-    }
+  const handleEditCartItem = (item: CartItem) => {
+    setEditingItem(item);
+  };
 
-    try {
-      const { api } = await import('../services/api');
-      await api.operations.create({
-        ticket_number: ticketNumber,
-        customer_id: selectedCustomer?.id,
-        items: cartItems,
-      });
+  const handleSaveCartItem = (updatedItem: CartItem) => {
+    updateCartItem?.(updatedItem.id, updatedItem);
+    setEditingItem(null);
+  };
 
-      clearCart();
-      setSelectedCustomer(null);
-      setForm(initialFormState);
-      await fetchTicketNumber();
-      toast.success('Drop completed successfully!');
-    } catch (err) {
-      console.error('Failed to complete drop:', err);
-      toast.error('Failed to complete drop');
-    }
+  const handleDeleteCartItem = (id: string) => {
+    removeFromCart(id);
+    setEditingItem(null);
+  };
+
+  const handleComplete = () => {
+    toast.success('Drop completed!');
+    clearCart();
+    setSelectedCustomer(null);
+    setForm(getInitialFormState());
+    setActiveStep('customer');
+    fetchTicketNumber();
   };
 
   const handleAddNewCustomer = async (name: string, phone: string) => {
@@ -188,13 +309,316 @@ export default function DropPage() {
     }
   };
 
-  const canAddToCart = Boolean(form.category && form.price);
+  // Check if step is completed
+  const isStepCompleted = (step: StepName): boolean => {
+    switch (step) {
+      case 'customer': return Boolean(selectedCustomer);
+      case 'category': return Boolean(form.category);
+      case 'color': return Boolean(form.color);
+      case 'brand': return Boolean(form.brand);
+      case 'material': return Boolean(form.material);
+      case 'description': return Boolean(form.shortDescription);
+      case 'memos': return form.memos.length > 0;
+      case 'service': return Boolean(form.service);
+      case 'variation': return Boolean(form.variation);
+      case 'price': return Boolean(form.price);
+      default: return false;
+    }
+  };
+
+  // Get step value for display in collapsed bar
+  const getStepValue = (step: StepName): string => {
+    switch (step) {
+      case 'customer': return selectedCustomer?.name || '';
+      case 'category': return form.category;
+      case 'color': return form.color;
+      case 'brand': return form.brand;
+      case 'material': return form.material;
+      case 'description': return form.shortDescription || '(none)';
+      case 'memos': return form.memos.length > 0 ? form.memos.join(', ') : '(none)';
+      case 'service': return form.service;
+      case 'variation': return form.variation;
+      case 'price': return form.price ? formatCurrency(parseInt(form.price)) : '';
+      default: return '';
+    }
+  };
+
+  // Get step icon
+  const getStepIcon = (step: StepName): string => {
+    const icons: Record<StepName, string> = {
+      customer: '👤',
+      category: CATEGORIES.find(c => c.name === form.category)?.icon || '👠',
+      color: '🎨',
+      brand: '🏷️',
+      material: '🧵',
+      description: '📝',
+      memos: '📋',
+      service: '🔧',
+      variation: '⚙️',
+      price: '💰',
+    };
+    return icons[step];
+  };
+
+  // Render form for each step
+  const renderStepForm = () => {
+    switch (activeStep) {
+      case 'customer':
+        return (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search customer..."
+                value={customerSearchTerm}
+                onChange={(e) => {
+                  setCustomerSearchTerm(e.target.value);
+                  setShowCustomerSearch(true);
+                }}
+                onFocus={() => setShowCustomerSearch(true)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-700 rounded-xl text-white placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none"
+              />
+            </div>
+            {showCustomerSearch && customerSearchTerm && (
+              <div className="bg-gray-700 rounded-xl border border-gray-600 overflow-hidden">
+                {customers
+                  .filter(c => c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()))
+                  .slice(0, 5)
+                  .map(customer => (
+                    <button
+                      key={customer.id}
+                      onClick={() => handleCustomerSelect(customer)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-600 transition-colors text-gray-200"
+                    >
+                      {customer.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+            {customerSearchTerm && !customers.some(c => c.name.toLowerCase() === customerSearchTerm.toLowerCase()) && (
+              <button
+                onClick={() => handleAddNewCustomer(customerSearchTerm, '')}
+                className="w-full flex items-center gap-2 px-4 py-3 bg-gray-700 hover:bg-gray-600 rounded-xl text-gray-300 text-sm transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add &quot;{customerSearchTerm}&quot; as new customer
+              </button>
+            )}
+            <button
+              onClick={() => advanceStep('customer')}
+              className="text-sm text-gray-400 hover:text-white"
+            >
+              Skip - No Customer
+            </button>
+          </div>
+        );
+
+      case 'category':
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat.name}
+                onClick={() => handleCategorySelect(cat.name)}
+                className={`p-3 rounded-xl text-sm font-medium transition-all ${
+                  form.category === cat.name
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                }`}
+              >
+                <span className="text-lg mr-1">{cat.icon}</span>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        );
+
+      case 'color':
+        return (
+          <div className="grid grid-cols-4 gap-2">
+            {colors.map(color => (
+              <button
+                key={color.name}
+                onClick={() => handleColorSelect(color.name)}
+                className={`p-3 rounded-xl text-sm font-medium transition-all flex flex-col items-center gap-1 ${
+                  form.color === color.name
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                }`}
+              >
+                <div
+                  className="w-6 h-6 rounded-full border-2 border-white/30"
+                  style={color.isRainbow ? {
+                    background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff)',
+                  } : {
+                    backgroundColor: color.hexCode,
+                  }}
+                />
+                {color.name}
+              </button>
+            ))}
+          </div>
+        );
+
+      case 'brand':
+        return (
+          <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto pr-1">
+            {BRANDS.map(brand => (
+              <button
+                key={brand}
+                onClick={() => handleBrandSelect(brand)}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${
+                  form.brand === brand
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                }`}
+              >
+                {brand}
+              </button>
+            ))}
+          </div>
+        );
+
+      case 'material':
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            {MATERIALS.map(material => (
+              <button
+                key={material}
+                onClick={() => handleMaterialSelect(material)}
+                className={`p-3 rounded-xl text-sm font-medium transition-all ${
+                  form.material === material
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                }`}
+              >
+                {material}
+              </button>
+            ))}
+          </div>
+        );
+
+      case 'description':
+        return (
+          <div className="space-y-3">
+            <textarea
+              value={form.shortDescription}
+              onChange={(e) => handleDescriptionChange(e.target.value)}
+              placeholder="Add description (optional)..."
+              className="w-full px-4 py-3 bg-gray-700 rounded-xl text-white placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none resize-none"
+              rows={3}
+            />
+            <button
+              onClick={() => advanceStep('description')}
+              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        );
+
+      case 'memos':
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              {MEMOS.map(memo => (
+                <button
+                  key={memo}
+                  onClick={() => handleMemoToggle(memo)}
+                  className={`p-3 rounded-xl text-sm font-medium transition-all ${
+                    form.memos.includes(memo)
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  }`}
+                >
+                  {memo}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={handleMemoContinue}
+              className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        );
+
+      case 'service':
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            {SERVICES.map(svc => (
+              <button
+                key={svc.name}
+                onClick={() => handleServiceSelect(svc.name)}
+                className={`p-4 rounded-xl text-sm font-medium transition-all flex flex-col items-start ${
+                  form.service === svc.name
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                }`}
+              >
+                <span>{svc.name}</span>
+                <span className="text-xs opacity-70">{formatCurrency(svc.estimatedPrice)}</span>
+              </button>
+            ))}
+          </div>
+        );
+
+      case 'variation':
+        return (
+          <div className="space-y-3">
+            <div className="text-sm text-gray-400 mb-2">What needs fixing?</div>
+            <div className="grid grid-cols-2 gap-2">
+              {SERVICE_VARIATIONS.map(v => (
+                <button
+                  key={v}
+                  onClick={() => handleVariationSelect(v)}
+                  className={`p-4 rounded-xl text-sm font-medium transition-all ${
+                    form.variation === v
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'price':
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-gray-400 mb-1.5 block">Enter Price (UGX)</label>
+              <input
+                type="number"
+                value={form.price}
+                onChange={(e) => handlePriceChange(e.target.value)}
+                placeholder="0"
+                className="w-full px-4 py-4 bg-gray-700 rounded-xl text-white text-2xl font-bold placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none"
+                autoFocus
+              />
+            </div>
+            {form.price && parseInt(form.price, 10) > 0 && (
+              <div className="text-center text-gray-400 text-sm">
+                Item will be added automatically...
+              </div>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
-      {/* Page Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-white">NEW DROP</h1>
+    <div className="min-h-screen bg-gray-900 p-4 flex flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-4 flex-shrink-0">
+        <h1 className="text-xl font-bold text-white">NEW DROP</h1>
         {ticketLoading ? (
           <span className="text-gray-400 text-sm">Loading...</span>
         ) : ticketNumber ? (
@@ -205,271 +629,83 @@ export default function DropPage() {
             <User className="w-4 h-4 text-gray-400" />
             <span className="text-gray-200 text-sm">{selectedCustomer.name}</span>
             <button
-              onClick={handleCustomerClear}
-              className="text-gray-400 hover:text-white ml-1"
+              onClick={() => {
+                setSelectedCustomer(null);
+                setForm(prev => ({ ...prev, customerId: '' }));
+                setActiveStep('customer');
+              }}
+              className="text-gray-400 hover:text-white"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
+        {cartItems.length > 0 && (
+          <button
+            onClick={() => {
+              clearCart();
+              setForm(getInitialFormState());
+              setActiveStep('category');
+            }}
+            className="text-sm text-red-400 hover:text-red-300"
+          >
+            Clear All
+          </button>
+        )}
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
-        {/* LEFT: Cascade Form */}
-        <div className="space-y-4">
-          {/* Customer Section */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-indigo-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Customer</span>
-              {customerLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select customer</span>
-              )}
-            </div>
-
-            {!customerLocked ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Search customers..."
-                      className="w-full pl-9 pr-3 py-2 bg-gray-700 rounded-lg text-white text-sm placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                      value={customerSearchTerm}
-                      onChange={e => setCustomerSearchTerm(e.target.value)}
-                      onFocus={() => setShowCustomerSearch(true)}
-                    />
-                  </div>
-                  <button
-                    onClick={() => setShowCustomerSearch(!showCustomerSearch)}
-                    className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm"
-                  >
-                    Search
-                  </button>
-                </div>
-
-                {showCustomerSearch && (
-                  <div className="bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto">
-                    {filteredCustomers.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center py-2">No customers found</p>
-                    ) : (
-                      filteredCustomers.map(c => (
-                        <button
-                          key={c.id}
-                          onClick={() => handleCustomerSelect(c)}
-                          className="w-full text-left p-2 rounded-lg hover:bg-gray-800 transition-colors"
-                        >
-                          <div className="text-white text-sm">{c.name}</div>
-                          <div className="text-gray-400 text-xs">{c.phone}</div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {/* Quick add customer */}
-                {customerSearchTerm && !showCustomerSearch && (
-                  <button
-                    onClick={() => handleAddNewCustomer(customerSearchTerm, '')}
-                    className="w-full flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-gray-300 text-sm transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add &quot;{customerSearchTerm}&quot; as new customer
-                  </button>
-                )}
+      {/* Main content */}
+      <div className="flex gap-4 flex-1 overflow-hidden">
+        {/* Left side */}
+        <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+          {/* Cart items grid */}
+          {cartItems.length > 0 && (
+            <div className="flex-shrink-0">
+              <h3 className="text-white font-semibold mb-2 text-sm">Items ({cartItems.length})</h3>
+              <div className="grid grid-cols-3 gap-3">
+                {cartItems.map(item => (
+                  <CartItemCard
+                    key={item.id}
+                    item={item}
+                    onEdit={handleEditCartItem}
+                    onRemove={removeFromCart}
+                  />
+                ))}
               </div>
-            ) : null}
-          </div>
-
-          {/* Category */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-indigo-400">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Category</span>
-              {categoryLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select category</span>
-              )}
             </div>
-            <CascadeSelect
-              label="Category"
-              options={CATEGORIES}
-              value={form.category}
-              onChange={val => setForm(prev => ({ ...prev, category: val }))}
-              onClear={() => setForm(prev => ({ ...prev, category: '' }))}
-              disabled={customerLocked || categoryLocked}
-              placeholder="Select category..."
-            />
+          )}
+
+          {/* Stepper bars for completed steps */}
+          <div className="flex gap-3 flex-wrap">
+            {STEPS_ORDER.filter(step =>
+              step !== 'price' && isStepCompleted(step) && step !== activeStep
+            ).map(step => (
+              <div key={step} className="flex-1 min-w-[180px]">
+                <CollapsedStep
+                  icon={getStepIcon(step)}
+                  label={step.charAt(0).toUpperCase() + step.slice(1)}
+                  value={getStepValue(step)}
+                  onEdit={() => editStep(step)}
+                />
+              </div>
+            ))}
           </div>
 
-          {/* Color */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-cyan-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Color</span>
-              {colorLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select color</span>
-              )}
-            </div>
-            <CascadeSelect
-              label="Color"
-              options={COLORS}
-              value={form.color}
-              onChange={val => setForm(prev => ({ ...prev, color: val }))}
-              onClear={() => setForm(prev => ({ ...prev, color: '' }))}
-              disabled={!customerLocked || categoryLocked || colorLocked}
-              placeholder="Select color..."
-            />
+          {/* Active form section */}
+          <div className="flex-1 overflow-y-auto">
+            <StepSection
+              title={activeStep.charAt(0).toUpperCase() + activeStep.slice(1)}
+              icon={getStepIcon(activeStep)}
+              color="border-t-indigo-500"
+              isActive={true}
+            >
+              {renderStepForm()}
+            </StepSection>
           </div>
-
-          {/* Brand */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-emerald-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Brand</span>
-              {brandLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select brand</span>
-              )}
-            </div>
-            <CascadeSelect
-              label="Brand"
-              options={BRANDS}
-              value={form.brand}
-              onChange={val => setForm(prev => ({ ...prev, brand: val }))}
-              onClear={() => setForm(prev => ({ ...prev, brand: '' }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || brandLocked}
-              placeholder="Select brand..."
-            />
-          </div>
-
-          {/* Material */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-amber-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Material</span>
-              {materialLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select material</span>
-              )}
-            </div>
-            <CascadeSelect
-              label="Material"
-              options={MATERIALS}
-              value={form.material}
-              onChange={val => setForm(prev => ({ ...prev, material: val }))}
-              onClear={() => setForm(prev => ({ ...prev, material: '' }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || !brandLocked || materialLocked}
-              placeholder="Select material..."
-            />
-          </div>
-
-          {/* Short Description */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-violet-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Short Description</span>
-              <span className="text-xs text-gray-400">Optional</span>
-            </div>
-            <input
-              type="text"
-              placeholder="Enter brief description..."
-              className="w-full px-3 py-2 bg-gray-700 rounded-lg text-white text-sm placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-              value={form.shortDescription}
-              onChange={e => setForm(prev => ({ ...prev, shortDescription: e.target.value }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || !brandLocked || !materialLocked}
-            />
-          </div>
-
-          {/* Memos */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-blue-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Memos</span>
-              <span className="text-xs text-gray-400">Multi-select</span>
-            </div>
-            <MemoSelect
-              options={MEMOS}
-              value={form.memos}
-              onChange={memos => setForm(prev => ({ ...prev, memos }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || !brandLocked || !materialLocked}
-            />
-          </div>
-
-          {/* Service */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-rose-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Service</span>
-              {serviceLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select service</span>
-              )}
-            </div>
-            <CascadeSelect
-              label="Service"
-              options={SERVICES}
-              value={form.service}
-              onChange={val => setForm(prev => ({ ...prev, service: val }))}
-              onClear={() => setForm(prev => ({ ...prev, service: '' }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || !brandLocked || !materialLocked || serviceLocked}
-              placeholder="Select service..."
-            />
-          </div>
-
-          {/* Service Variation */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-pink-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Service Variation</span>
-              {variationLocked ? (
-                <span className="text-xs text-amber-400">Locked</span>
-              ) : (
-                <span className="text-xs text-gray-400">Select variation</span>
-              )}
-            </div>
-            <CascadeSelect
-              label="Variation"
-              options={SERVICE_VARIATIONS}
-              value={form.variation}
-              onChange={val => setForm(prev => ({ ...prev, variation: val }))}
-              onClear={() => setForm(prev => ({ ...prev, variation: '' }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || !brandLocked || !materialLocked || !serviceLocked || variationLocked}
-              placeholder="Select variation..."
-            />
-          </div>
-
-          {/* Price */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 border-t-4 border-t-green-500">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-semibold text-gray-200">Price</span>
-              <span className="text-xs text-gray-400">Enter price</span>
-            </div>
-            <PriceInput
-              value={form.price}
-              onChange={val => setForm(prev => ({ ...prev, price: val }))}
-              disabled={!customerLocked || !categoryLocked || !colorLocked || !brandLocked || !materialLocked || !serviceLocked || !variationLocked}
-            />
-          </div>
-
-          {/* Add to Cart Button */}
-          <button
-            onClick={handleAddToCart}
-            disabled={!canAddToCart}
-            className={`w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-              canAddToCart
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            <Plus className="w-5 h-5" />
-            ADD TO CART
-          </button>
         </div>
 
-        {/* RIGHT: Cart Summary */}
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        {/* Right sidebar - Cart Summary */}
+        <div className="w-72 flex-shrink-0">
           <CartSummary
             items={cartItems}
             ticketNumber={ticketNumber}
@@ -479,6 +715,16 @@ export default function DropPage() {
           />
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {editingItem && (
+        <EditItemModal
+          item={editingItem}
+          onSave={handleSaveCartItem}
+          onDelete={handleDeleteCartItem}
+          onClose={() => setEditingItem(null)}
+        />
+      )}
     </div>
   );
 }

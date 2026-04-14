@@ -47,6 +47,7 @@ interface OperationContextType {
   ticketNumber: string;
   addToCart: (item: CartItem) => void;
   removeFromCart: (id: string) => void;
+  updateCartItem: (id: string, item: CartItem) => void;
   clearCart: () => void;
   setTicketNumber: (num: string) => void;
   fetchTicketNumber: () => Promise<string>;
@@ -207,6 +208,10 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
     setCartItems(prev => prev.filter(i => i.id !== id));
   }, []);
 
+  const updateCartItem = useCallback((id: string, updatedItem: CartItem) => {
+    setCartItems(prev => prev.map(i => i.id === id ? updatedItem : i));
+  }, []);
+
   const clearCart = useCallback(() => {
     setCartItems([]);
     setTicketNumber('');
@@ -235,11 +240,12 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
       ticketNumber,
       addToCart,
       removeFromCart,
+      updateCartItem,
       clearCart,
       setTicketNumber,
       fetchTicketNumber,
     }),
-    [operations, refreshOperations, cartItems, ticketNumber, setCartItems, setTicketNumber, addToCart, removeFromCart, clearCart, fetchTicketNumber]
+    [operations, refreshOperations, cartItems, ticketNumber, setCartItems, setTicketNumber, addToCart, removeFromCart, updateCartItem, clearCart, fetchTicketNumber]
   );
 
   return (
