@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, X, User, Pencil, Check } from 'lucide-react';
+import { Search, Plus, X, User, Pencil, Check, ShoppingBag } from 'lucide-react';
 import { useOperation } from '../contexts/OperationContext';
 import { useCustomer } from '../contexts/CustomerContext';
 import { useRetailProducts, type RetailProduct } from '../contexts/RetailProductContext';
@@ -119,12 +119,25 @@ export default function DropPage() {
   const [activeStep, setActiveStep] = useState<StepName>('customer');
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [customCategory, setCustomCategory] = useState('');
+  const [showProducts, setShowProducts] = useState(false);
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
   // Product handlers
   const handleProductSelect = (product: RetailProduct, customPrice?: number) => {
-    toast.success(`Added ${product.name} to sale`);
+    const item: CartItem = {
+      id: crypto.randomUUID(),
+      category: 'Product',
+      color: '',
+      brand: product.category,
+      material: '',
+      shortDescription: product.name,
+      memos: [],
+      services: [],
+      price: customPrice || product.price,
+    };
+    addToCart(item);
+    toast.success(`Added ${product.name} to cart`);
   };
 
   const handleEditProduct = (product: RetailProduct) => {
@@ -736,15 +749,27 @@ export default function DropPage() {
             </StepSection>
           </div>
 
-          {/* Product Sales Section */}
-          <div className="flex-shrink-0 border-t border-gray-700 pt-3">
-            <ProductSalesSection
-              isAdmin={isAdmin}
-              onProductSelect={handleProductSelect}
-              onEditProduct={handleEditProduct}
-              onDeleteProduct={handleDeleteProduct}
-              onAddProduct={handleAddProduct}
-            />
+          {/* Products Toggle */}
+          <div className="flex-shrink-0">
+            <button
+              onClick={() => setShowProducts(!showProducts)}
+              className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              {showProducts ? 'Hide Products' : 'Show Products'}
+            </button>
+
+            {showProducts && (
+              <div className="mt-2">
+                <ProductSalesSection
+                  isAdmin={isAdmin}
+                  onProductSelect={handleProductSelect}
+                  onEditProduct={handleEditProduct}
+                  onDeleteProduct={handleDeleteProduct}
+                  onAddProduct={handleAddProduct}
+                />
+              </div>
+            )}
           </div>
 
           {/* Service shortcuts - fixed at bottom */}
