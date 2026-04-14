@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, X, User, Pencil, Check } from 'lucide-react';
 import { useOperation } from '../contexts/OperationContext';
 import { useCustomer } from '../contexts/CustomerContext';
+import { useRetailProducts, type RetailProduct } from '../contexts/RetailProductContext';
+import { useAuthStore } from '../store/authStore';
 import type { Customer, CartItem, DropFormState } from '../types';
 import PillChip from '../components/drop/PillChip';
 import StepSection from '../components/drop/StepSection';
 import EditItemModal from '../components/drop/EditItemModal';
 import CartSummary from '../components/drop/CartSummary';
 import TicketBadge from '../components/drop/TicketBadge';
+import ProductSalesSection from '../components/drop/ProductSalesSection';
 import { formatCurrency } from '../utils/formatCurrency';
 import toast from 'react-hot-toast';
 
@@ -116,6 +119,25 @@ export default function DropPage() {
   const [activeStep, setActiveStep] = useState<StepName>('customer');
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [customCategory, setCustomCategory] = useState('');
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
+
+  // Product handlers
+  const handleProductSelect = (product: RetailProduct, customPrice?: number) => {
+    toast.success(`Added ${product.name} to sale`);
+  };
+
+  const handleEditProduct = (product: RetailProduct) => {
+    toast.info('Product editing coming soon');
+  };
+
+  const handleDeleteProduct = (id: string) => {
+    toast.info('Product deletion coming soon');
+  };
+
+  const handleAddProduct = () => {
+    toast.info('Product creation coming soon');
+  };
 
   // Fetch ticket number and colors on mount
   useEffect(() => {
@@ -712,6 +734,17 @@ export default function DropPage() {
             >
               {renderStepForm()}
             </StepSection>
+          </div>
+
+          {/* Product Sales Section */}
+          <div className="flex-shrink-0 border-t border-gray-700 pt-3">
+            <ProductSalesSection
+              isAdmin={isAdmin}
+              onProductSelect={handleProductSelect}
+              onEditProduct={handleEditProduct}
+              onDeleteProduct={handleDeleteProduct}
+              onAddProduct={handleAddProduct}
+            />
           </div>
 
           {/* Service shortcuts - fixed at bottom */}
