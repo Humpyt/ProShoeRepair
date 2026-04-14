@@ -694,7 +694,7 @@ export default function DropPage() {
         </div>
 
         {/* Right sidebar - Cart Summary */}
-        <div className="w-72 flex-shrink-0">
+        <div className="w-96 flex-shrink-0">
           <CartSummary
             items={cartItems}
             ticketNumber={ticketNumber}
