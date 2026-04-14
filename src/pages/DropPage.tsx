@@ -171,7 +171,9 @@ export default function DropPage() {
 
   const handleCategorySelect = (category: string) => {
     setForm(prev => ({ ...prev, category }));
-    advanceStep('category');
+    if (category !== 'Other') {
+      advanceStep('category');
+    }
   };
 
   const handleColorSelect = (color: string) => {
@@ -415,21 +417,45 @@ export default function DropPage() {
 
       case 'category':
         return (
-          <div className="grid grid-cols-3 gap-2">
-            {CATEGORIES.map(cat => (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.name}
+                  onClick={() => handleCategorySelect(cat.name)}
+                  className={`p-3 rounded-xl text-sm font-medium transition-all ${
+                    form.category === cat.name
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                  }`}
+                >
+                  <span className="text-lg mr-1">{cat.icon}</span>
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+            {form.category === 'Other' && (
+              <input
+                type="text"
+                placeholder="Enter custom category..."
+                autoFocus
+                className="w-full px-4 py-3 bg-gray-700 rounded-xl text-white placeholder-gray-400 border border-gray-600 focus:border-indigo-500 outline-none"
+                onChange={(e) => setForm(prev => ({ ...prev, category: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && form.category && form.category !== 'Other') {
+                    advanceStep('category');
+                  }
+                }}
+              />
+            )}
+            {form.category && form.category !== 'Other' && (
               <button
-                key={cat.name}
-                onClick={() => handleCategorySelect(cat.name)}
-                className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                  form.category === cat.name
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-                }`}
+                onClick={() => advanceStep('category')}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors"
               >
-                <span className="text-lg mr-1">{cat.icon}</span>
-                {cat.name}
+                Continue
               </button>
-            ))}
+            )}
           </div>
         );
 
