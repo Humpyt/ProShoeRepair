@@ -1,20 +1,34 @@
-import React from 'react';
-import { ShoppingCart, Check, Package, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, Check, Package, Sparkles, DollarSign, Smartphone, CreditCard } from 'lucide-react';
 import { CartItem as CartItemType } from '../../types';
 import CartItemCard from './CartItemCard';
 import { formatCurrency } from '../../utils/formatCurrency';
+
+type PaymentMethod = 'cash' | 'mobile_money' | 'bank_card' | 'none';
 
 interface CartSummaryProps {
   items: CartItemType[];
   ticketNumber: string;
   onRemoveItem: (id: string) => void;
-  onComplete: () => void;
+  onComplete: (paymentMethod?: PaymentMethod) => void;
   disabled?: boolean;
   previewItem?: CartItemType | null;
   onPriceChange?: (price: number) => void;
   onDone?: (item: CartItemType) => void;
   onCartItemPriceChange?: (id: string, price: number) => void;
 }
+
+const PAYMENT_ICONS = {
+  cash: DollarSign,
+  mobile_money: Smartphone,
+  bank_card: CreditCard,
+};
+
+const PAYMENT_LABELS = {
+  cash: 'Cash',
+  mobile_money: 'Mobile',
+  bank_card: 'Card',
+};
 
 const CartSummary: React.FC<CartSummaryProps> = ({
   items,
@@ -27,9 +41,14 @@ const CartSummary: React.FC<CartSummaryProps> = ({
   onDone,
   onCartItemPriceChange,
 }) => {
+  const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>('none');
   const total = items.reduce((sum, item) => sum + item.price, 0);
   const itemCount = items.length;
   const isDisabled = disabled || itemCount === 0;
+
+  const handleComplete = () => {
+    onComplete(selectedPayment === 'none' ? undefined : selectedPayment);
+  };
 
   return (
     <div className="bg-white rounded-none shadow-xl border-l border-gray-100 h-full flex flex-col w-full">
@@ -117,25 +136,59 @@ const CartSummary: React.FC<CartSummaryProps> = ({
         )}
       </div>
 
-      {/* Footer - totals and action */}
-      <div className="border-t-2 border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0">
-        <div className="flex justify-between items-center mb-3">
+      {/* Footer - totals, payment, and action */}
+      <div className="border-t-2 border-gray-200 p-4 bg-gradient-to-r from-gray-50 to-gray-100 flex-shrink-0 space-y-3">
+        {/* Total */}
+        <div className="flex justify-between items-center">
           <span className="text-gray-600 font-bold text-lg">TOTAL</span>
           <span className="text-gray-800 font-bold text-2xl">{formatCurrency(total)}</span>
         </div>
+
+        {/* Payment Methods */}
+        {items.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-[10px] text-gray-400 uppercase tracking-wide font-medium">Payment Method</span>
+            <div className="grid grid-cols-3 gap-1.5">
+              {(Object.keys(PAYMENT_ICONS) as PaymentMethod[]).map((method) => {
+                const Icon = PAYMENT_ICONS[method];
+                const isSelected = selectedPayment === method;
+                return (
+                  <button
+                    key={method}
+                    onClick={() => setSelectedPayment(method)}
+                    className={`
+                      flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-all text-xs font-medium
+                      ${isSelected
+                        ? method === 'cash' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                          : method === 'mobile_money' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                          : 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }
+                    `}
+                  >
+                    <Icon className="w-4 h-4 mb-0.5" />
+                    <span>{PAYMENT_LABELS[method]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Complete Button */}
         <button
-          onClick={onComplete}
+          onClick={handleComplete}
           disabled={isDisabled}
           className={`
             w-full py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all
             ${isDisabled
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700'
+              : 'bg-gradient-to-r from-emerald-500 to-green-600 text-white hover:from-emerald-600 hover:to-green-700 shadow-lg shadow-emerald-500/20'
             }
           `}
         >
           <Check className="w-4 h-4" />
-          COMPLETE DROP
+          {selectedPayment !== 'none' ? 'PAY & COMPLETE' : 'COMPLETE DROP'}
         </button>
       </div>
     </div>

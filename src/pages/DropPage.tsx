@@ -363,8 +363,12 @@ export default function DropPage() {
     }
   };
 
-  const handleComplete = () => {
-    toast.success('Drop completed!');
+  const handleComplete = (paymentMethod?: 'cash' | 'mobile_money' | 'bank_card') => {
+    if (paymentMethod && cartItems.length > 0) {
+      toast.success(`Drop completed! Payment: ${paymentMethod.replace('_', ' ')}`);
+    } else {
+      toast.success('Drop completed!');
+    }
     clearCart();
     setSelectedCustomer(null);
     setForm(getInitialFormState());
