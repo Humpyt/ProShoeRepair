@@ -903,12 +903,14 @@ export default function DropPage() {
                   <button
                     key={service}
                     onClick={() => {
+                      const newMemos = prev.memos.includes(service) ? prev.memos : [...prev.memos, service];
+                      const targetStep = getFirstIncompleteStep({ ...prev, service, memos: newMemos });
                       setForm(prev => ({
                         ...prev,
                         service,
-                        memos: prev.memos.includes(service) ? prev.memos : [...prev.memos, service]
+                        memos: newMemos
                       }));
-                      setActiveStep(getFirstIncompleteStep(form));
+                      setActiveStep(targetStep);
                     }}
                     className="px-3 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors"
                   >
@@ -921,8 +923,9 @@ export default function DropPage() {
                   <button
                     key={service}
                     onClick={() => {
+                      const targetStep = getFirstIncompleteStep({ ...prev, service });
                       setForm(prev => ({ ...prev, service }));
-                      setActiveStep('variation');
+                      setActiveStep(targetStep);
                     }}
                     className="px-3 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition-colors"
                   >
