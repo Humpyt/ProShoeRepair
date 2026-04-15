@@ -902,7 +902,8 @@ export default function DropPage() {
                       setForm(prev => ({
                         ...prev,
                         service,
-                        variation: 'New Pair'
+                        variation: 'New Pair',
+                        memos: prev.memos.includes(service) ? prev.memos : [...prev.memos, service]
                       }));
                       // Navigate to first incomplete required step
                       if (!form.category) {
@@ -929,7 +930,8 @@ export default function DropPage() {
                       setForm(prev => ({
                         ...prev,
                         service,
-                        variation: 'New Pair'
+                        variation: 'New Pair',
+                        memos: prev.memos.includes(service) ? prev.memos : [...prev.memos, service]
                       }));
                       // Navigate to first incomplete required step
                       if (!form.category) {
