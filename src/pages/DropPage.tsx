@@ -138,15 +138,6 @@ export default function DropPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
-  // Find the first incomplete step to navigate to after shortcut selection
-  const getFirstIncompleteStep = (form: DropFormState): StepName => {
-    if (!form.category) return 'category';
-    if (!form.color) return 'color';
-    if (!form.material) return 'material';
-    if (form.memos.length === 0) return 'memos';
-    return 'service'; // All filled, go to service step
-  };
-
   // Product handlers
   const handleProductSelect = (product: RetailProduct, customPrice?: number) => {
     const item: CartItem = {
@@ -903,14 +894,14 @@ export default function DropPage() {
                   <button
                     key={service}
                     onClick={() => {
-                      const newMemos = form.memos.includes(service) ? form.memos : [...form.memos, service];
-                      const targetStep = getFirstIncompleteStep({ ...form, service, memos: newMemos });
                       setForm(prev => ({
                         ...prev,
+                        category: prev.category || 'Other',
                         service,
-                        memos: newMemos
+                        color: prev.color || '',
+                        material: prev.material || '',
+                        memos: prev.memos.includes(service) ? prev.memos : [...prev.memos, service]
                       }));
-                      setActiveStep(targetStep);
                     }}
                     className="px-3 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-medium rounded-lg transition-colors"
                   >
@@ -923,14 +914,8 @@ export default function DropPage() {
                   <button
                     key={service}
                     onClick={() => {
-                      const newMemos = form.memos.includes(service) ? form.memos : [...form.memos, service];
-                      const targetStep = getFirstIncompleteStep({ ...form, service, memos: newMemos });
-                      setForm(prev => ({
-                        ...prev,
-                        service,
-                        memos: newMemos
-                      }));
-                      setActiveStep(targetStep);
+                      setForm(prev => ({ ...prev, service }));
+                      setActiveStep('variation');
                     }}
                     className="px-3 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium rounded-lg transition-colors"
                   >
