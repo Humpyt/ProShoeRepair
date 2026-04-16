@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Clock, Package, CheckCircle, AlertCircle, PlusCircle, TrendingUp, DollarSign, Users } from 'lucide-react';
+import { Package, CheckCircle, AlertCircle, PlusCircle, TrendingUp, DollarSign } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import type { RepairItem } from '../types';
 import { useAuthStore } from '../store/authStore';
-import { pendingRepairs, mockRepairs, completedRepairs, mockPickups } from '../data/mockData';
+import { mockRepairs, completedRepairs, mockPickups } from '../data/mockData';
 import { formatCurrency } from '../utils/formatCurrency';
 
 // Mock data for charts

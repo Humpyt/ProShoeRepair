@@ -23,7 +23,7 @@ import analyticsRouter from './routes/analytics';
 import retailProductsRouter from './routes/retailProducts';
 import expensesRouter from './routes/expenses';
 import ticketRouter from './routes/ticket';
-import { transformCustomer, transformOperation, transformService } from './utils';
+import { transformOperation } from './utils';
 
 const app = express();
 const port = 3000;

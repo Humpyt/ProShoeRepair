@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from '../config/api';
 import { useNavigate } from 'react-router-dom';
-import { Users, PlusCircle, Briefcase, Mail, Target, TrendingUp, AlertCircle, LayoutGrid, LayoutList, Loader2, Trophy } from 'lucide-react';
+import { Users, PlusCircle, Briefcase, Mail, Target, TrendingUp, LayoutGrid, LayoutList, Loader2, Trophy } from 'lucide-react';
 import type { Staff } from '../types';
 import StaffModal from './StaffModal';
 import StaffTargetModal from './StaffTargetModal';

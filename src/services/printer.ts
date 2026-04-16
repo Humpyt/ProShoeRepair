@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { formatCurrency } from '../utils/formatCurrency';
 
 interface PrinterConfig {
   type?: string;
