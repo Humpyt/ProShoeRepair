@@ -12,19 +12,43 @@ export const pool = new Pool({
 
 // withTransaction helper
 export async function withTransaction<T>(
-  fn: (client: PoolClient) => Promise<T>
+  fn: (client: PoolClient & {
+    run(sql: string, params?: any[]): Promise<{ lastID: number; changes: number }>;
+    get(sql: string, params?: any[]): Promise<any>;
+    all(sql: string, params?: any[]): Promise<any[]>;
+  }) => Promise<T>
 ): Promise<T> {
-  const client = await pool.connect();
+  const rawClient = await pool.connect();
+  // Wrap client with .run(), .get(), .all() methods for SQLite-like compatibility
+  const client = rawClient as PoolClient & {
+    run(sql: string, params?: any[]): Promise<{ lastID: number; changes: number }>;
+    get(sql: string, params?: any[]): Promise<any>;
+    all(sql: string, params?: any[]): Promise<any[]>;
+  };
+  client.run = async (sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> => {
+    const result = await rawClient.query(sql, params);
+    const lastID = result.rows[0]?.id || 0;
+    const changes = result.rowCount || 0;
+    return { lastID, changes };
+  };
+  client.get = async (sql: string, params: any[] = []): Promise<any> => {
+    const result = await rawClient.query(sql, params);
+    return result.rows[0] || null;
+  };
+  client.all = async (sql: string, params: any[] = []): Promise<any[]> => {
+    const result = await rawClient.query(sql, params);
+    return result.rows;
+  };
   try {
-    await client.query('BEGIN');
+    await rawClient.query('BEGIN');
     const result = await fn(client);
-    await client.query('COMMIT');
+    await rawClient.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await rawClient.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    rawClient.release();
   }
 }
 

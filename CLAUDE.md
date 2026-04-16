@@ -77,6 +77,17 @@ npm run cleanup:services         # Remove duplicate services from database
 - `supplies.ts` - Supplies tracking
 - `categories.ts` - Product categories
 - `products.ts` - Product catalog
+- `analytics.ts` - Analytics and reporting data
+- `auth.ts` - Authentication endpoints
+- `business.ts` - Business settings and configuration
+- `credits.ts` - Customer credits management
+- `expenses.ts` - Expense tracking endpoints
+- `invoices.ts` - Invoice generation and management
+- `retailProducts.ts` - Retail product management
+- `staffMessages.ts` - Staff communication/messaging
+- `ticket.ts` - Ticket-specific endpoints
+- `colors.ts` - Color/swatch management
+- `sales.ts` - Sales transaction endpoints
 
 **Database schema key tables:**
 - `customers` - Customer records with loyalty points, total_orders, total_spent
@@ -101,6 +112,9 @@ npm run cleanup:services         # Remove duplicate services from database
 - `CartContext` - Shopping cart for sales
 - `AdminContext` - Admin-specific state
 - `ServiceContext` - Service catalog and pricing
+- `ExpenseContext` - Business expense tracking
+- `RetailProductContext` - Retail product catalog
+- `StaffMessageContext` - Staff messaging/communications
 
 **Authentication:** Zustand store (`src/store/authStore.ts`) for local mock auth, also used by DropPage for admin mode
 - Mock users with roles: admin, manager, staff
@@ -121,7 +135,7 @@ npm run cleanup:services         # Remove duplicate services from database
 **Key pages:**
 - `/tickets` - Main tickets/repair orders list
 - `/ticket-search` - Search tickets by various criteria
-- `/drop` - New repair order drop-off
+- `/drop` - New repair order drop-off (also available as `DropPageLookup.tsx` root file)
 - `/assembly`, `/racking` - Workshop workflow stages
 - `/pickup-order`, `/pickup` - Customer pickup processing
 - `/deliveries` - Delivery management
@@ -132,10 +146,22 @@ npm run cleanup:services         # Remove duplicate services from database
 - `/expenses` - Business expense tracking
 - `/supplies` - Supply inventory management
 - `/sales` - Retail sales
-- `/drop` - Drop workflow page for repair intake (also available as `DropPageLookup.tsx` root file)
 - `/invoices` - Invoice management
 - `/reports` - Analytics and reporting
 - `/marketing` - Customer communications
+- `/credits` - Customer credit list
+- `/operation` - Operation details view
+- `/no-charge-do-over` - No charge / do over orders
+- `/ready-to-pick` - Orders ready for pickup
+- `/customer-rankings` - Customer loyalty rankings
+- `/most-performing` - Most performing items/services
+- `/new-customers` - New customer acquisition
+- `/discounts` - Discount management
+- `/stock-levels` - Inventory stock levels
+- `/store` - Store settings and configuration
+- `/message` - Staff messaging
+- `/unpaid-balances` - Unpaid balance tracking
+- `/operation-page` - Full operation management page
 
 **API integration:** Backend via Vite proxy:
 - Vite dev server proxies `/api` requests to `http://localhost:3000`

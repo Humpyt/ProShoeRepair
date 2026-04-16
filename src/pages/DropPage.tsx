@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, X, User, Pencil, Check, ShoppingBag } from 'lucide-react';
 import { useOperation } from '../contexts/OperationContext';
 import { useCustomer } from '../contexts/CustomerContext';
+import { useServices } from '../contexts/ServiceContext';
 import { useRetailProducts, type RetailProduct } from '../contexts/RetailProductContext';
 import { useAuthStore } from '../store/authStore';
 import type { Customer, CartItem, DropFormState } from '../types';
@@ -119,8 +120,9 @@ const getInitialFormState = (): DropFormState => ({
 });
 
 export default function DropPage() {
-  const { cartItems, addToCart, removeFromCart, clearCart, updateCartItem, ticketNumber, fetchTicketNumber } = useOperation();
+  const { cartItems, addToCart, removeFromCart, clearCart, updateCartItem, ticketNumber, fetchTicketNumber, addOperation } = useOperation();
   const { customers, addCustomer } = useCustomer();
+  const { services } = useServices();
 
   const [form, setForm] = useState<DropFormState>(getInitialFormState());
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -135,6 +137,8 @@ export default function DropPage() {
   const [brandSearchTerm, setBrandSearchTerm] = useState('');
   const [brandPage, setBrandPage] = useState(0);
   const [customBrand, setCustomBrand] = useState('');
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [serviceIdMap, setServiceIdMap] = useState<Map<string, string>>(new Map());
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
@@ -188,6 +192,21 @@ export default function DropPage() {
     };
     fetchColors();
   }, []);
+
+  // Build service name-to-ID map
+  useEffect(() => {
+    if (services.length === 0) return;
+    const map = new Map<string, string>();
+    services.forEach(svc => {
+      map.set(svc.name.toLowerCase(), svc.id);
+      // Also map first word for partial matching
+      const firstWord = svc.name.toLowerCase().split(' ')[0];
+      if (firstWord && firstWord !== svc.name.toLowerCase()) {
+        map.set(firstWord, svc.id);
+      }
+    });
+    setServiceIdMap(map);
+  }, [services]);
 
   // Build preview item from current form state
   const previewItem: CartItem | null = form.category ? {
@@ -363,19 +382,84 @@ export default function DropPage() {
     }
   };
 
-  const handleComplete = (data: { timing: 'prepay' | 'postpay'; method?: 'cash' | 'mobile_money' | 'bank_card' }) => {
-    if (data.timing === 'prepay' && data.method && cartItems.length > 0) {
-      toast.success(`Drop completed! Payment: ${data.method.replace('_', ' ')}`);
-    } else if (data.timing === 'postpay') {
-      toast.success('Drop completed! Post-pay recorded.');
-    } else {
-      toast.success('Drop completed!');
+  const handleComplete = async (data: { timing: 'prepay' | 'postpay'; method?: 'cash' | 'mobile_money' | 'bank_card' }) => {
+    if (cartItems.length === 0) {
+      toast.error('No items in cart');
+      return;
     }
-    clearCart();
-    setSelectedCustomer(null);
-    setForm(getInitialFormState());
-    setActiveStep('customer');
-    fetchTicketNumber();
+    if (!selectedCustomer) {
+      toast.error('Please select a customer');
+      return;
+    }
+
+    setIsCompleting(true);
+    try {
+      // Transform cart items to API format
+      const shoes = cartItems
+        .filter(item => item.category !== 'Product')
+        .map(item => {
+          const notes = [item.shortDescription, ...item.memos].filter(Boolean).join(' | ');
+          return {
+            category: item.category,
+            color: item.color || '',
+            notes,
+            services: item.services.map(s => {
+              const serviceId = serviceIdMap.get(s.service.toLowerCase()) ||
+                               serviceIdMap.get(s.service.toLowerCase().split(' ')[0]) ||
+                               '';
+              return {
+                service_id: serviceId,
+                quantity: 1,
+                price: s.price || item.price / (item.services.length || 1),
+                notes: s.variation || null,
+              };
+            }),
+          };
+        });
+
+      const totalAmount = cartItems.reduce((sum, item) => sum + item.price, 0);
+
+      const operationData = {
+        customer: {
+          id: selectedCustomer.id,
+          name: selectedCustomer.name,
+          phone: selectedCustomer.phone,
+        },
+        shoes,
+        retailItems: cartItems
+          .filter(item => item.category === 'Product')
+          .map(item => ({
+            productId: null,
+            productName: item.shortDescription || item.brand,
+            unitPrice: item.price,
+            quantity: 1,
+            totalPrice: item.price,
+          })),
+        status: 'pending' as const,
+        totalAmount,
+        discount: 0,
+        isNoCharge: false,
+        isDoOver: false,
+        isDelivery: false,
+        isPickup: false,
+        notes: '',
+        ticket_number: ticketNumber,
+      };
+
+      await addOperation(operationData);
+
+      toast.success('Drop completed!');
+      clearCart();
+      setSelectedCustomer(null);
+      setForm(getInitialFormState());
+      setActiveStep('customer');
+      fetchTicketNumber();
+    } catch (error) {
+      console.error('Error completing drop:', error);
+      toast.error('Failed to save order. Please try again.');
+    } finally {
+      setIsCompleting(false);
+    }
   };
 
   const handleAddNewCustomer = async (name: string, phone: string) => {
@@ -967,7 +1051,7 @@ export default function DropPage() {
             ticketNumber={ticketNumber}
             onRemoveItem={removeFromCart}
             onComplete={handleComplete}
-            disabled={cartItems.length === 0}
+            disabled={isCompleting || cartItems.length === 0 || !selectedCustomer}
             previewItem={previewItem}
             onPriceChange={handlePreviewPriceChange}
             onDone={handlePreviewDone}
