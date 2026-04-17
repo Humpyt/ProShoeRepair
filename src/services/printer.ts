@@ -38,6 +38,13 @@ export interface ReceiptData {
   notes?: string;
 }
 
+export interface PolicyPrintData {
+  ticketNumber: string;
+  date: string;
+  customerNumber: string;
+  customerName: string;
+}
+
 class PrinterService {
   private config: PrinterConfig;
   private baseUrl = '/api/printer';
@@ -99,6 +106,15 @@ class PrinterService {
       }
     } catch (error) {
       console.error('Failed to print receipt:', error);
+      throw error;
+    }
+  }
+
+  async printPolicy(data: PolicyPrintData): Promise<void> {
+    try {
+      await axios.post(`${this.baseUrl}/print/policy`, data);
+    } catch (error) {
+      console.error('Failed to print policy:', error);
       throw error;
     }
   }
