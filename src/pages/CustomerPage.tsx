@@ -629,14 +629,13 @@ export default function CustomerPage() {
                 </div>
 
                 {/* Store Credit */}
-                {selectedCustomer.accountBalance > 0 && (
-                  <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
-                    <div className="text-green-300 text-sm">Store Credit</div>
-                    <div className="text-2xl font-bold text-green-400">
-                      {formatCurrency(selectedCustomer.accountBalance)}
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">Available credit balance</div>
+                <div className="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                  <div className="text-green-300 text-sm">Store Credit</div>
+                  <div className="text-2xl font-bold text-green-400">
+                    {formatCurrency(selectedCustomer.accountBalance || 0)}
                   </div>
+                  <div className="text-xs text-gray-400 mt-1">Available credit balance</div>
+                </div>
                 )}
 
                 {/* Outstanding Debt */}
