@@ -328,7 +328,7 @@ router.get('/targets/staff/all', async (req, res) => {
           WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
         `, [staff.id, startOfDay, endOfDay]);
 
-        const todayTotal = (todayOpsResult as any)?.total || 0 + (todaySalesResult as any)?.total || 0;
+        const todayTotal = ((todayOpsResult as any)?.total || 0) + ((todaySalesResult as any)?.total || 0);
 
         // Calculate monthly sales
         const monthlyOpsResult = await db.get(`
@@ -343,7 +343,7 @@ router.get('/targets/staff/all', async (req, res) => {
           WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
         `, [staff.id, startOfMonth, endOfMonth]);
 
-        const monthlyTotal = (monthlyOpsResult as any)?.total || 0 + (monthlySalesResult as any)?.total || 0;
+        const monthlyTotal = ((monthlyOpsResult as any)?.total || 0) + ((monthlySalesResult as any)?.total || 0);
 
         // Calculate metrics
         const todayPercentage = Math.min((todayTotal / dailyTarget) * 100, 100);
@@ -426,7 +426,7 @@ router.get('/targets/staff/:userId', async (req, res) => {
       WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
     `, [userId, startOfDay, endOfDay]);
 
-    const todayTotal = (todayOpsResult as any)?.total || 0 + (todaySalesResult as any)?.total || 0;
+    const todayTotal = ((todayOpsResult as any)?.total || 0) + ((todaySalesResult as any)?.total || 0);
 
     // Calculate monthly sales
     const monthlyOpsResult = await db.get(`
@@ -441,7 +441,7 @@ router.get('/targets/staff/:userId', async (req, res) => {
       WHERE created_by = $1 AND created_at >= $2 AND created_at <= $3
     `, [userId, startOfMonth, endOfMonth]);
 
-    const monthlyTotal = (monthlyOpsResult as any)?.total || 0 + (monthlySalesResult as any)?.total || 0;
+    const monthlyTotal = ((monthlyOpsResult as any)?.total || 0) + ((monthlySalesResult as any)?.total || 0);
 
     // Get daily breakdown for the month
     const dailyBreakdown = await db.all(`

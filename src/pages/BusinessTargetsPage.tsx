@@ -143,7 +143,7 @@ const BusinessTargetsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-400 text-sm">Monthly Target</p>
-                <p className="text-2xl font-bold text-white">{formatCurrency(104000000)}</p>
+                <p className="text-2xl font-bold text-white">{formatCurrency(businessSummary?.targets?.businessMonthly || 0)}</p>
               </div>
               <div className="bg-indigo-900/50 p-3 rounded-lg">
                 <Target className="text-indigo-400" size={24} />
