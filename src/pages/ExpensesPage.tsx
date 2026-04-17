@@ -145,13 +145,32 @@ const ExpensesPage: React.FC = () => {
     setDateRange({ start: null, end: null });
   };
 
+  const clearAllFilters = () => {
+    setDateRange({ start: null, end: null });
+    setFilterCategory('');
+    setFilterStatus('');
+  };
+
+  const hasActiveFilters = dateRange.start || filterCategory || filterStatus;
+
   return (
     <div className="h-full bg-gray-900 p-4 overflow-y-auto no-scrollbar">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Expense Analytics</h1>
-          <p className="text-gray-400 text-sm">Track and manage operational costs</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Expense Analytics</h1>
+            <p className="text-gray-400 text-sm">Track and manage operational costs</p>
+          </div>
+          {hasActiveFilters && (
+            <button
+              onClick={clearAllFilters}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-600 hover:border-rose-500/50 text-gray-300 hover:text-rose-400 rounded-lg text-xs transition-all"
+            >
+              <X size={12} />
+              Clear filters
+            </button>
+          )}
         </div>
         <button
           onClick={() => { setEditingExpense(null); setModalOpen(true); }}
@@ -205,16 +224,38 @@ const ExpensesPage: React.FC = () => {
       {/* Summary Cards - Compact Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {/* Total This Month */}
-        <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+        <button
+          onClick={() => {
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            setDateRange({ start: startOfMonth, end: now });
+            setActiveTab('month');
+          }}
+          className={`bg-gray-800 rounded-xl p-3 border text-left transition-all hover:border-indigo-500/50 hover:bg-gray-750 ${
+            dateRange.start && activeTab === 'month' ? 'border-indigo-500 ring-1 ring-indigo-500/30' : 'border-gray-700'
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-xs">This Month</span>
             <Wallet size={14} className="text-indigo-400" />
           </div>
           <p className="text-xl font-bold text-white">{formatCurrency(analytics?.totalThisMonth || 0)}</p>
-        </div>
+          {dateRange.start && activeTab === 'month' && (
+            <p className="text-[10px] text-indigo-400 mt-1">Filtered</p>
+          )}
+        </button>
 
         {/* Top Category */}
-        <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+        <button
+          onClick={() => {
+            if (topCategory) {
+              setFilterCategory(topCategory.category);
+            }
+          }}
+          className={`bg-gray-800 rounded-xl p-3 border text-left transition-all hover:border-emerald-500/50 hover:bg-gray-750 ${
+            filterCategory && topCategory && filterCategory === topCategory.category ? 'border-emerald-500 ring-1 ring-emerald-500/30' : 'border-gray-700'
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-xs">Top Category</span>
             <TrendingUp size={14} className="text-emerald-400" />
@@ -223,7 +264,10 @@ const ExpensesPage: React.FC = () => {
             {topCategory ? topCategory.category.split('&')[0].trim() : 'N/A'}
           </p>
           <p className="text-xs text-gray-400">{topCategory ? formatCurrency(topCategory.amount) : ''}</p>
-        </div>
+          {filterCategory && topCategory && filterCategory === topCategory.category && (
+            <p className="text-[10px] text-emerald-400 mt-1">Filtered</p>
+          )}
+        </button>
 
         {/* Daily Average */}
         <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
@@ -232,10 +276,20 @@ const ExpensesPage: React.FC = () => {
             <ArrowRightLeft size={14} className="text-amber-400" />
           </div>
           <p className="text-xl font-bold text-white">{formatCurrency(dailyAverage)}</p>
+          <p className="text-[10px] text-gray-500 mt-1">
+            {new Date().getDate()} days @ {formatCurrency(analytics?.totalThisMonth || 0)}
+          </p>
         </div>
 
-        {/* Status */}
-        <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+        {/* Pending */}
+        <button
+          onClick={() => {
+            setFilterStatus(filterStatus === 'pending' ? '' : 'pending');
+          }}
+          className={`bg-gray-800 rounded-xl p-3 border text-left transition-all hover:border-rose-500/50 hover:bg-gray-750 ${
+            filterStatus === 'pending' ? 'border-rose-500 ring-1 ring-rose-500/30' : 'border-gray-700'
+          }`}
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-xs">Pending</span>
             <Calendar size={14} className="text-rose-400" />
@@ -243,11 +297,14 @@ const ExpensesPage: React.FC = () => {
           <p className="text-xl font-bold text-white">
             {formatCurrency(analytics?.statusBreakdown?.find(s => s.status === 'pending')?.amount || 0)}
           </p>
-        </div>
+          {filterStatus === 'pending' && (
+            <p className="text-[10px] text-rose-400 mt-1">Filtered</p>
+          )}
+        </button>
       </div>
 
       {/* Filters & Transaction List */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700">
+      <div className="card-bevel overflow-hidden">
         <div className="flex justify-between items-center p-3 border-b border-gray-700">
           <h3 className="text-sm font-semibold text-gray-200">Recent Expenses</h3>
           <div className="flex items-center gap-2">
@@ -294,107 +351,100 @@ const ExpensesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Expense List */}
-        <div className="max-h-96 overflow-y-auto">
-          {loading ? (
-            <div className="flex items-center justify-center py-8 text-gray-400 text-sm">
-              Loading...
-            </div>
-          ) : filteredExpenses.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Receipt className="text-gray-500 mb-2" size={24} />
-              <p className="text-gray-400 text-sm">No expenses found</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-700">
-              {filteredExpenses.map((exp) => (
-                <div
-                  key={exp.id}
-                  className="hover:bg-gray-750/50 transition-colors group"
-                >
-                  <div className="flex items-center justify-between p-3">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        exp.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
-                        exp.status === 'overdue' ? 'bg-rose-500/10 text-rose-400' :
-                        'bg-amber-500/10 text-amber-400'
-                      }`}>
-                        {getCategoryIcon(exp.category)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-white truncate">{exp.title}</p>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                            exp.status === 'paid' ? 'bg-emerald-500/20 text-emerald-400' :
-                            exp.status === 'overdue' ? 'bg-rose-500/20 text-rose-400' :
-                            'bg-amber-500/20 text-amber-400'
-                          }`}>
-                            {exp.status}
-                          </span>
+        {/* Expense Table */}
+        <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+          <table className="w-full">
+            <thead className="bg-gray-800/80 backdrop-blur-sm sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Date</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Title</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Category</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Staff</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Vendor</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Payment</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    Loading...
+                  </td>
+                </tr>
+              ) : filteredExpenses.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    No expenses found
+                  </td>
+                </tr>
+              ) : (
+                filteredExpenses.map((exp, index) => (
+                  <tr
+                    key={exp.id}
+                    className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-300">{format(new Date(exp.date), 'MMM d, yyyy')}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm font-medium text-white">{exp.title}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center ${
+                          exp.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400' :
+                          exp.status === 'overdue' ? 'bg-rose-500/10 text-rose-400' :
+                          'bg-amber-500/10 text-amber-400'
+                        }`}>
+                          {getCategoryIcon(exp.category)}
                         </div>
-                        <p className="text-xs text-gray-500">
-                          {exp.category.split('&')[0].trim()} • {format(new Date(exp.date), 'MMM d, yyyy')}
-                        </p>
+                        <span className="text-sm text-gray-300">{exp.category.split('&')[0].trim()}</span>
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-white">{formatCurrency(exp.amount)}</p>
-                        <p className="text-[10px] text-gray-500">
-                          {exp.paymentMethod || 'N/A'}
-                        </p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-300">{exp.createdByName || 'Unknown'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-sm text-gray-400">{exp.vendor || '-'}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-sm font-semibold text-white">{formatCurrency(exp.amount)}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        exp.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                        exp.status === 'overdue' ? 'bg-rose-100 text-rose-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                        {exp.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500">{exp.paymentMethod || '-'}</span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEditExpense(exp)}
+                            className="p-1 text-gray-400 hover:text-indigo-400 transition-colors"
+                          >
+                            <Edit size={12} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteExpense(exp.id)}
+                            className="p-1 text-gray-400 hover:text-rose-400 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleEditExpense(exp)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-400 transition-colors"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteExpense(exp.id)}
-                          className="p-1.5 text-gray-400 hover:text-rose-400 transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Additional Details Row */}
-                  <div className="px-3 pb-3 pt-0 ml-11">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
-                      {exp.createdByName && (
-                        <span className="flex items-center gap-1">
-                          <User size={12} className="text-indigo-400" />
-                          <span className="text-indigo-400">{exp.createdByName}</span>
-                        </span>
-                      )}
-                      {exp.vendor && (
-                        <span className="flex items-center gap-1">
-                          <Store size={12} className="text-gray-500" />
-                          {exp.vendor}
-                        </span>
-                      )}
-                      {exp.paymentMethod && (
-                        <span className="flex items-center gap-1">
-                          <CreditCard size={12} className="text-gray-500" />
-                          {exp.paymentMethod}
-                        </span>
-                      )}
-                    </div>
-                    {exp.notes && (
-                      <div className="flex items-start gap-1 mt-1 text-xs text-gray-500">
-                        <FileText size={12} className="flex-shrink-0 mt-0.5" />
-                        <span className="line-clamp-1">{exp.notes}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

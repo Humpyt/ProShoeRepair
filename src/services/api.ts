@@ -15,11 +15,11 @@ export const api = {
       if (!response.ok) throw new Error('Failed to fetch customers');
       const result = await response.json();
 
-      // Transform snake_case to camelCase
+      // Transform snake_case to camelCase, capitalize first letter of name
       return {
         data: result.data.map((customer: any) => ({
         id: customer.id,
-        name: customer.name,
+        name: (customer.name || '').charAt(0).toUpperCase() + (customer.name || '').slice(1),
         phone: customer.phone,
         email: customer.email || '',
         address: customer.address || '',
@@ -36,19 +36,24 @@ export const api = {
     },
 
     create: async (customer: Omit<Customer, 'id'>): Promise<Customer> => {
+      // Capitalize first letter of name before sending
+      const capitalizedCustomer = {
+        ...customer,
+        name: customer.name ? customer.name.trim().charAt(0).toUpperCase() + customer.name.trim().slice(1) : '',
+      };
       const response = await fetch(`${API_URL}/customers`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(customer),
+        body: JSON.stringify(capitalizedCustomer),
       });
       if (!response.ok) throw new Error('Failed to create customer');
       const created: any = await response.json();
       // Transform snake_case from API to camelCase for frontend
       return {
         id: created.id,
-        name: created.name,
+        name: (created.name || '').charAt(0).toUpperCase() + (created.name || '').slice(1),
         phone: created.phone,
         email: created.email || '',
         address: created.address || '',

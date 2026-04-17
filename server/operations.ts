@@ -2,6 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import db from './database';
 import { transformOperation } from './utils';
+import { applyPaymentsToOperation, PaymentInput, PaymentSource } from './helpers/applyPayments';
 
 const router = express.Router();
 
@@ -46,7 +47,7 @@ router.get('/', async (req, res) => {
     const parsedOffset = parseInt(offset as string) || 0;
 
     let query = `
-      SELECT o.*, c.name as customer_name, c.phone as customer_phone, u.name as staff_name
+      SELECT o.*, c.id as customer_id, c.name as customer_name, c.phone as customer_phone, u.name as staff_name
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
       LEFT JOIN users u ON o.created_by = u.id
@@ -210,7 +211,7 @@ router.post('/', async (req, res) => {
     customer,
     shoes = [],
     retailItems = [],
-    status,
+    workflow_status = 'pending',
     totalAmount,
     discount,
     isNoCharge,
@@ -221,13 +222,13 @@ router.post('/', async (req, res) => {
     promisedDate,
     created_by,
     ticket_number,
+    payments = [],
   } = req.body;
   const now = new Date().toISOString();
   const normalizedShoes = Array.isArray(shoes) ? shoes : [];
   const normalizedRetailItems = Array.isArray(retailItems) ? retailItems : [];
   const finalTotalAmount = Number(totalAmount) || 0;
   const discountAmount = Number(discount) || 0;
-  let generatedDocumentId: string | null = null;
 
   if (!customer || !customer.id) {
     console.error('Invalid customer data:', customer);
@@ -239,22 +240,27 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'At least one repair or retail item is required' });
   }
 
+  let operationId: string = '';
+
   try {
+    // First transaction: Create the operation
     await db.withTransaction(async (client) => {
       // Insert the operation
-      const operationId = uuidv4();
+      operationId = uuidv4();
       console.log('Creating operation with ID:', operationId);
 
       await client.run(`
         INSERT INTO operations (
-          id, customer_id, status, total_amount, discount, notes, promised_date,
+          id, customer_id, status, workflow_status, payment_status, total_amount, discount, notes, promised_date,
           is_no_charge, is_do_over, is_delivery, is_pickup,
           created_by, created_at, updated_at, ticket_number
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       `, [
         operationId,
         customer.id,
-        status || 'pending',
+        'pending', // legacy status field - kept for compatibility
+        workflow_status, // new workflow_status field
+        'unpaid', // initial payment_status (will be updated if payments provided)
         finalTotalAmount,
         discountAmount,
         notes || null,
@@ -347,49 +353,6 @@ router.post('/', async (req, res) => {
         ]);
       }
 
-      // Return the created operation with all related data
-      const operation = await client.get(`
-        SELECT
-          o.*,
-          c.name as customer_name,
-          c.phone as customer_phone,
-          c.email as customer_email
-        FROM operations o
-        LEFT JOIN customers c ON o.customer_id = c.id
-        WHERE o.id = $1
-      `, [operationId]);
-
-      // Get shoes for this operation
-      const operationShoes = await client.all(`
-        SELECT * FROM operation_shoes WHERE operation_id = $1
-      `, [operationId]);
-      const operationRetailItems = (await getRetailItemsByOperationIds([operationId])).get(operationId) || [];
-
-      // Get services for each shoe
-      const shoesWithServices = [];
-      for (const shoe of operationShoes) {
-        const services = await client.all(`
-          SELECT
-            os.*,
-            s.name as service_name,
-            s.price as service_base_price
-          FROM operation_services os
-          LEFT JOIN services s ON os.service_id = s.id
-          WHERE os.operation_shoe_id = $1
-        `, [shoe.id]);
-
-        shoesWithServices.push({
-          ...shoe,
-          services: services.map((s: any) => ({
-            id: s.service_id,
-            name: s.service_name,
-            price: s.price,
-            quantity: s.quantity,
-            notes: s.notes
-          }))
-        });
-      }
-
       // Update customer stats: increment total_orders and update last_visit
       await client.run(`
         UPDATE customers
@@ -397,41 +360,87 @@ router.post('/', async (req, res) => {
             last_visit = $1
         WHERE id = $2
       `, [now, customer.id]);
-
-      // Auto-generate invoice since no payment was made yet
-      try {
-        const invoiceId = uuidv4();
-        const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-        await client.run(`
-          INSERT INTO invoices (
-            id, operation_id, type, invoice_number, customer_name, customer_phone,
-            subtotal, discount, total, amount_paid, payment_method, notes,
-            promised_date, generated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-        `, [
-          invoiceId, operationId, 'invoice', invoiceNumber,
-          customer.name, customer.phone || '',
-          finalTotalAmount + discountAmount, discountAmount, finalTotalAmount,
-          0, null, notes || null, promisedDate || null, created_by || null, now, now
-        ]);
-        generatedDocumentId = invoiceId;
-      } catch (err) {
-        console.error('Failed to auto-generate invoice:', err);
-      }
-
-      res.json(transformOperation({
-        ...operation,
-        shoes: shoesWithServices,
-        retailItems: operationRetailItems,
-        isNoCharge: Boolean(operation.is_no_charge),
-        isDoOver: Boolean(operation.is_do_over),
-        isDelivery: Boolean(operation.is_delivery),
-        isPickup: Boolean(operation.is_pickup),
-        discount: operation.discount || 0,
-        generatedDocumentId,
-        generatedDocumentType: generatedDocumentId ? 'invoice' : null,
-      }));
     });
+
+    // Transaction committed. Now handle payments or invoice generation.
+
+    // If payments provided at creation, apply them using the shared helper
+    if (payments && payments.length > 0) {
+      console.log('[POST /] Applying payments at creation:', payments);
+      const paymentResult = await applyPaymentsToOperation(operationId, payments as PaymentInput[], 'drop');
+      if (!paymentResult.success) {
+        console.error('[POST /] Payment application failed:', paymentResult.error);
+        return res.status(400).json({ error: paymentResult.error });
+      }
+      console.log('[POST /] Payments applied successfully');
+      return res.json(paymentResult.operation);
+    }
+
+    // No payments: auto-generate invoice
+    const invoiceId = uuidv4();
+    const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    try {
+      await db.run(`
+        INSERT INTO invoices (
+          id, operation_id, type, invoice_number, customer_name, customer_phone,
+          subtotal, discount, total, amount_paid, payment_method, notes,
+          promised_date, generated_by, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      `, [
+        invoiceId, operationId, 'invoice', invoiceNumber,
+        customer.name, customer.phone || '',
+        finalTotalAmount + discountAmount, discountAmount, finalTotalAmount,
+        0, null, notes || null, promisedDate || null, created_by || null, now, now
+      ]);
+    } catch (err) {
+      console.error('Failed to auto-generate invoice:', err);
+    }
+
+    // Return the created operation
+    const operation = await db.get(`
+      SELECT o.*, c.name as customer_name, c.phone as customer_phone, c.email as customer_email
+      FROM operations o
+      LEFT JOIN customers c ON o.customer_id = c.id
+      WHERE o.id = $1
+    `, [operationId]);
+
+    const operationShoes = await db.all(`SELECT * FROM operation_shoes WHERE operation_id = $1`, [operationId]);
+    const operationRetailItems = (await getRetailItemsByOperationIds([operationId])).get(operationId) || [];
+
+    const shoesWithServices = [];
+    for (const shoe of operationShoes) {
+      const services = await db.all(`
+        SELECT os.*, s.name as service_name, s.price as service_base_price
+        FROM operation_services os
+        LEFT JOIN services s ON os.service_id = s.id
+        WHERE os.operation_shoe_id = $1
+      `, [shoe.id]);
+
+      shoesWithServices.push({
+        ...shoe,
+        services: services.map((s: any) => ({
+          id: s.service_id,
+          name: s.service_name,
+          price: s.price,
+          quantity: s.quantity,
+          notes: s.notes
+        }))
+      });
+    }
+
+    res.json(transformOperation({
+      ...operation,
+      shoes: shoesWithServices,
+      retailItems: operationRetailItems,
+      isNoCharge: Boolean(operation.is_no_charge),
+      isDoOver: Boolean(operation.is_do_over),
+      isDelivery: Boolean(operation.is_delivery),
+      isPickup: Boolean(operation.is_pickup),
+      discount: operation.discount || 0,
+      generatedDocumentId: invoiceId,
+      generatedDocumentType: invoiceId ? 'invoice' : null,
+    }));
+
   } catch (error) {
     console.error('Error creating operation:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to create operation' });
@@ -478,138 +487,90 @@ router.patch('/:id', async (req, res) => {
 router.post('/:id/payments', async (req, res) => {
   try {
     const { id } = req.params;
-    const { payments } = req.body; // Array of { method, amount, transaction_id }
+    const { payments } = req.body;
+
+    console.log('[PAYMENT] Received payment request for operation:', id);
+    console.log('[PAYMENT] Payments data:', JSON.stringify(payments));
 
     if (!Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json({ error: 'Payments array is required' });
     }
 
-    // Get operation
-    const operation = await db.get(`
-      SELECT o.*, c.name as customer_name, c.phone as customer_phone
-      FROM operations o
-      LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE o.id = $1
-    `, [id]);
+    // Use the shared payment helper
+    const result = await applyPaymentsToOperation(id, payments as PaymentInput[], 'pickup');
+
+    if (!result.success) {
+      console.log('[PAYMENT] Payment application failed:', result.error);
+      return res.status(400).json({ error: result.error });
+    }
+
+    console.log('[PAYMENT] Payment applied successfully');
+    res.json(result.operation);
+
+  } catch (error) {
+    console.error('Error processing payment:', error);
+    res.status(500).json({ error: 'Failed to process payment' });
+  }
+});
+
+// Update workflow status (for marking as picked up, delivered, etc.)
+router.patch('/:id/workflow-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { workflow_status, picked_up_at } = req.body;
+
+    const validTransitions: Record<string, string[]> = {
+      'pending': ['in_progress', 'cancelled'],
+      'in_progress': ['ready', 'cancelled'],
+      'ready': ['delivered', 'cancelled'],
+      'delivered': [],
+      'cancelled': []
+    };
+
+    // Get current operation
+    const operation = await db.get('SELECT workflow_status FROM operations WHERE id = $1', [id]);
     if (!operation) {
       return res.status(404).json({ error: 'Operation not found' });
     }
 
-    const totalPaid = payments.reduce((sum: number, p: any) => sum + p.amount, 0);
+    const currentStatus = operation.workflow_status || 'pending';
+
+    // Validate transition
+    if (!validTransitions[currentStatus]?.includes(workflow_status)) {
+      return res.status(400).json({
+        error: `Invalid transition from '${currentStatus}' to '${workflow_status}'`
+      });
+    }
+
     const now = new Date().toISOString();
+    const updates: string[] = ['workflow_status = $1', 'updated_at = $2'];
+    const values: any[] = [workflow_status, now];
 
-    let generatedDocumentId: string | null = null;
-    let generatedDocumentType: 'invoice' | 'receipt' | null = null;
+    if (picked_up_at) {
+      values.push(picked_up_at);
+      updates.push(`picked_up_at = $${values.length}`);
+    }
 
-    await db.withTransaction(async (client) => {
-      // Add each payment
-      for (const payment of payments) {
-        const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await client.run(`
-          INSERT INTO operation_payments (id, operation_id, payment_method, amount, transaction_id, created_at)
-          VALUES ($1, $2, $3, $4, $5, $6)
-        `, [paymentId, id, payment.method, payment.amount, payment.transaction_id || null, now]);
-      }
+    values.push(id);
 
-      // Update operation paid_amount
-      const newPaidAmount = (operation.paid_amount || 0) + totalPaid;
-      await client.run(`
-        UPDATE operations
-        SET paid_amount = $1,
-            status = CASE WHEN $2 >= total_amount THEN 'completed' ELSE status END,
-            updated_at = $3
-        WHERE id = $4
-      `, [newPaidAmount, newPaidAmount, now, id]);
+    await db.run(
+      `UPDATE operations SET ${updates.join(', ')} WHERE id = $${values.length}`,
+      values
+    );
 
-      // Update customer stats: add to total_spent and update last_visit
-      await client.run(`
-        UPDATE customers
-        SET total_spent = total_spent + $1,
-            last_visit = $2
-        WHERE id = $3
-      `, [totalPaid, now, (operation as any).customer_id]);
-
-      // Auto-capture 2% credit on transaction
-      const creditAmount = Math.round(totalPaid * 0.02);
-      if (creditAmount > 0) {
-        const customerId = (operation as any).customer_id;
-        const creditTransactionId = `credit_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const currentCustomer = await client.get('SELECT account_balance FROM customers WHERE id = $1', [customerId]);
-        const newCreditBalance = (currentCustomer?.account_balance || 0) + creditAmount;
-        await client.run(`
-          INSERT INTO customer_credits (id, customer_id, amount, balance_after, type, description, created_by, created_at)
-          VALUES ($1, $2, $3, $4, 'credit', $5, $6, $7)
-        `, [creditTransactionId, customerId, creditAmount, newCreditBalance, '2% transaction credit', null, now]);
-        await client.run('UPDATE customers SET account_balance = $1 WHERE id = $2', [newCreditBalance, customerId]);
-      }
-
-      // Auto-generate receipt if fully paid
-      if (newPaidAmount >= (operation as any).total_amount) {
-        try {
-          // Check if receipt already exists
-          const existingReceipt = await client.get(
-            'SELECT id FROM invoices WHERE operation_id = $1 AND type = $2',
-            [id, 'receipt']
-          );
-          if (!existingReceipt) {
-            const invoiceId = uuidv4();
-            const invoiceNumber = `RCP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
-            await client.run(`
-              INSERT INTO invoices (
-                id, operation_id, type, invoice_number, customer_name, customer_phone,
-                subtotal, discount, total, amount_paid, payment_method, notes,
-                promised_date, generated_by, created_at, updated_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-            `, [
-              invoiceId, id, 'receipt', invoiceNumber,
-              (operation as any).customer_name || '', (operation as any).customer_phone || '',
-              (operation as any).total_amount + ((operation as any).discount || 0),
-              (operation as any).discount || 0,
-              (operation as any).total_amount,
-              newPaidAmount,
-              payments[0]?.method || null,
-              (operation as any).notes,
-              (operation as any).promised_date,
-              null, now, now
-            ]);
-            generatedDocumentId = invoiceId;
-          } else {
-            generatedDocumentId = (existingReceipt as any).id;
-          }
-          generatedDocumentType = 'receipt';
-        } catch (err) {
-          console.error('Failed to auto-generate receipt:', err);
-        }
-      } else {
-        const existingInvoice = await client.get(
-          'SELECT id FROM invoices WHERE operation_id = $1 AND type = $2',
-          [id, 'invoice']
-        );
-        if (existingInvoice) {
-          generatedDocumentId = (existingInvoice as any).id;
-          generatedDocumentType = 'invoice';
-        }
-      }
-    });
-
-    // Return updated operation
+    // Get updated operation with customer info
     const updatedOperation = await db.get(`
       SELECT o.*, c.name as customer_name, c.phone as customer_phone
       FROM operations o
       LEFT JOIN customers c ON o.customer_id = c.id
       WHERE o.id = $1
     `, [id]);
-    const retailItems = (await getRetailItemsByOperationIds([id])).get(id) || [];
-    res.json(transformOperation({
-      ...updatedOperation,
-      retailItems,
-      generatedDocumentId,
-      generatedDocumentType,
-    }));
+
+    res.json(transformOperation(updatedOperation));
 
   } catch (error) {
-    console.error('Error processing payment:', error);
-    res.status(500).json({ error: 'Failed to process payment' });
+    console.error('Error updating workflow status:', error);
+    res.status(500).json({ error: 'Failed to update workflow status' });
   }
 });
 

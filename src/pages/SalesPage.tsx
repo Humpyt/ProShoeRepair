@@ -1,16 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { API_ENDPOINTS } from '../config/api';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../components/ui/table';
-import { Card } from '../components/ui/card';
 import { formatCurrency } from '../utils/formatCurrency';
-import { DollarSign, ShoppingBag, Wrench, Package, Calendar, ChevronDown, ArrowUpRight, Search } from 'lucide-react';
+import { DollarSign, ShoppingBag, Wrench, Package, Calendar, Search, TrendingUp, TrendingDown, Minus, ChevronDown } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -35,7 +26,6 @@ export default function SalesPage() {
   const [startDate, setStartDate] = useState<Date | null>(null);
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [selectedType, setSelectedType] = useState<string>('all');
-  const [totalSales, setTotalSales] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,14 +33,25 @@ export default function SalesPage() {
     fetchSales();
   }, [startDate, endDate, selectedType]);
 
+  // Listen for drop-completed event to refresh sales data
+  useEffect(() => {
+    const handleDropCompleted = (e: CustomEvent) => {
+      if (e.detail?.timing === 'prepay') {
+        fetchSales();
+      }
+    };
+    window.addEventListener('drop-completed', handleDropCompleted as EventListener);
+    return () => window.removeEventListener('drop-completed', handleDropCompleted as EventListener);
+  }, []);
+
   const fetchSales = async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       let url = API_ENDPOINTS.sales;
       const params = new URLSearchParams();
-      
+
       if (startDate) {
         params.append('startDate', startDate.toISOString());
       }
@@ -77,10 +78,6 @@ export default function SalesPage() {
       }
 
       setSales(data);
-      
-      // Calculate total sales
-      const total = data.reduce((sum: number, sale: Sale) => sum + (sale.total_amount || 0), 0);
-      setTotalSales(total);
     } catch (error) {
       console.error('Error fetching sales:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch sales');
@@ -88,6 +85,36 @@ export default function SalesPage() {
       setLoading(false);
     }
   };
+
+  // Compute analytics
+  const analytics = useMemo(() => {
+    const repairSales = sales.filter(s => s.sale_type === 'repair');
+    const retailSales = sales.filter(s => s.sale_type === 'retail');
+    const pickupSales = sales.filter(s => s.sale_type === 'pickup');
+
+    const totalAmount = sales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+    const repairAmount = repairSales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+    const retailAmount = retailSales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+    const pickupAmount = pickupSales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+
+    // This month
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthSales = sales.filter(s => new Date(s.created_at) >= startOfMonth);
+    const thisMonthTotal = thisMonthSales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
+
+    return {
+      count: sales.length,
+      repairCount: repairSales.length,
+      retailCount: retailSales.length,
+      pickupCount: pickupSales.length,
+      totalAmount,
+      repairAmount,
+      retailAmount,
+      pickupAmount,
+      thisMonthTotal,
+    };
+  }, [sales]);
 
   const renderSaleDetails = (sale: Sale) => {
     if (!sale.details?.length) return null;
@@ -104,14 +131,14 @@ export default function SalesPage() {
             )}
           </div>
         ));
-      
+
       case 'retail':
         return sale.details.map((item, index) => (
           <div key={index} className="text-sm text-gray-300">
             {item.name} x{item.quantity} @ {formatCurrency(item.price)}
           </div>
         ));
-      
+
       default:
         return null;
     }
@@ -131,191 +158,239 @@ export default function SalesPage() {
   return (
     <div className="min-h-screen bg-gray-900 p-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Sales Overview</h1>
+          <h1 className="text-2xl font-bold text-white">Sales</h1>
           <p className="text-gray-400">Monitor and analyze your sales performance</p>
         </div>
-        <div className="card-bevel px-6 py-4 bg-gradient-to-br from-gray-800 to-gray-900">
-          <div className="flex items-center space-x-3">
-            <DollarSign className="h-6 w-6 text-indigo-400" />
-            <div>
-              <p className="text-sm text-gray-400">Total Sales</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalSales)}</p>
-            </div>
+        <div className="flex items-center gap-3">
+          {/* Sale Type Tab Toggle */}
+          <div className="flex bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setSelectedType('all')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                selectedType === 'all'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSelectedType('repair')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                selectedType === 'repair'
+                  ? 'bg-green-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Wrench size={14} />
+                Repairs
+              </div>
+            </button>
+            <button
+              onClick={() => setSelectedType('retail')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                selectedType === 'retail'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingBag size={14} />
+                Retail
+              </div>
+            </button>
+          </div>
+          {/* Total Display */}
+          <div className="flex items-center space-x-2 text-gray-400 bg-gray-800 px-3 py-2 rounded-lg">
+            <Package className="h-4 w-4" />
+            <span className="text-sm">{analytics.count}</span>
+            <DollarSign className="h-4 w-4 ml-2" />
+            <span className="text-sm">{formatCurrency(analytics.totalAmount)}</span>
           </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="card-bevel p-6 bg-gradient-to-br from-gray-800 to-gray-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 font-medium">Repairs</p>
-              <p className="text-3xl font-bold text-white mt-2">
-                {sales.filter(s => s.sale_type === 'repair').length}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">Total repair orders</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-green-900/20 flex items-center justify-center">
-              <Wrench className="h-7 w-7 text-green-500" />
-            </div>
+      {/* Financial Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        {/* Total Sales */}
+        <div className="bg-gradient-to-br from-indigo-900/50 to-indigo-800/30 rounded-xl p-4 border border-indigo-700/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-indigo-300 text-xs font-medium flex items-center gap-1">
+              <TrendingUp size={12} />
+              TOTAL SALES
+            </span>
+            <DollarSign size={16} className="text-indigo-400" />
+          </div>
+          <p className="text-2xl font-bold text-white mb-1">
+            {formatCurrency(analytics.totalAmount)}
+          </p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-indigo-300">{analytics.count} transactions</span>
           </div>
         </div>
 
-        <div className="card-bevel p-6 bg-gradient-to-br from-gray-800 to-gray-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 font-medium">Retail Sales</p>
-              <p className="text-3xl font-bold text-white mt-2">
-                {sales.filter(s => s.sale_type === 'retail').length}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">Products sold</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-purple-900/20 flex items-center justify-center">
-              <ShoppingBag className="h-7 w-7 text-purple-500" />
-            </div>
+        {/* Repair Sales */}
+        <div className="bg-gradient-to-br from-green-900/50 to-green-800/30 rounded-xl p-4 border border-green-700/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-green-300 text-xs font-medium flex items-center gap-1">
+              <Wrench size={12} />
+              REPAIR SALES
+            </span>
+            <Wrench size={16} className="text-green-400" />
+          </div>
+          <p className="text-2xl font-bold text-white mb-1">
+            {formatCurrency(analytics.repairAmount)}
+          </p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-green-300">{analytics.repairCount} repairs</span>
           </div>
         </div>
 
-        <div className="card-bevel p-6 bg-gradient-to-br from-gray-800 to-gray-900">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 font-medium">Pickups</p>
-              <p className="text-3xl font-bold text-white mt-2">
-                {sales.filter(s => s.sale_type === 'pickup').length}
-              </p>
-              <p className="text-sm text-gray-500 mt-1">Orders picked up</p>
-            </div>
-            <div className="w-14 h-14 rounded-xl bg-orange-900/20 flex items-center justify-center">
-              <Package className="h-7 w-7 text-orange-500" />
-            </div>
+        {/* Retail Sales */}
+        <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/30 rounded-xl p-4 border border-purple-700/50">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-purple-300 text-xs font-medium flex items-center gap-1">
+              <ShoppingBag size={12} />
+              RETAIL SALES
+            </span>
+            <ShoppingBag size={16} className="text-purple-400" />
           </div>
+          <p className="text-2xl font-bold text-white mb-1">
+            {formatCurrency(analytics.retailAmount)}
+          </p>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-purple-300">{analytics.retailCount} items</span>
+          </div>
+        </div>
+      </div>
+
+      {/* This Month Summary */}
+      <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-800/50 rounded-xl border border-gray-700">
+        <div className="text-center">
+          <p className="text-gray-400 text-xs mb-1">Sales This Month</p>
+          <p className="text-lg font-bold text-indigo-400">{formatCurrency(analytics.thisMonthTotal)}</p>
+        </div>
+        <div className="text-center border-x border-gray-700">
+          <p className="text-gray-400 text-xs mb-1">Repair Revenue</p>
+          <p className="text-lg font-bold text-green-400">{formatCurrency(analytics.repairAmount)}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-gray-400 text-xs mb-1">Retail Revenue</p>
+          <p className="text-lg font-bold text-purple-400">{formatCurrency(analytics.retailAmount)}</p>
         </div>
       </div>
 
       {/* Filters Section */}
-      <div className="card-bevel p-6 bg-gradient-to-br from-gray-800 to-gray-900 mb-6">
-        <div className="flex items-center space-x-2 mb-4">
-          <Search className="h-5 w-5 text-indigo-400" />
-          <h2 className="text-lg font-medium text-gray-200">Filter Sales</h2>
+      <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-800/50 rounded-xl border border-gray-700">
+        <div className="flex items-center gap-2 text-gray-400 text-sm">
+          <Calendar size={14} />
+          <span>Filter by date:</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Start Date</label>
-            <div className="relative">
-              <DatePicker
-                selected={startDate}
-                onChange={setStartDate}
-                className="w-full pl-12 pr-4 py-3 bg-gray-700/50 rounded-xl border border-gray-700 focus:ring-2 focus:ring-indigo-500 text-white"
-                placeholderText="Select start date"
-                dateFormat="MMM d, yyyy"
-              />
-              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">End Date</label>
-            <div className="relative">
-              <DatePicker
-                selected={endDate}
-                onChange={setEndDate}
-                className="w-full pl-12 pr-4 py-3 bg-gray-700/50 rounded-xl border border-gray-700 focus:ring-2 focus:ring-indigo-500 text-white"
-                placeholderText="Select end date"
-                dateFormat="MMM d, yyyy"
-              />
-              <Calendar className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-2">Sale Type</label>
-            <div className="relative">
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                className="w-full pl-4 pr-10 py-3 bg-gray-700/50 rounded-xl border border-gray-700 focus:ring-2 focus:ring-indigo-500 text-white appearance-none"
-              >
-                <option value="all">All Types</option>
-                <option value="repair">Repairs</option>
-                <option value="retail">Retail</option>
-                <option value="pickup">Pickups</option>
-              </select>
-              <ChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" />
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
+          <DatePicker
+            selected={startDate}
+            onChange={(date) => setStartDate(date)}
+            selectsStart
+            startDate={startDate}
+            endDate={endDate}
+            placeholderText="Start date"
+            className="w-32 px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            dateFormat="MMM d, yyyy"
+          />
+          <span className="text-gray-500">-</span>
+          <DatePicker
+            selected={endDate}
+            onChange={(date) => setEndDate(date)}
+            selectsEnd
+            startDate={startDate}
+            endDate={endDate}
+            minDate={startDate || undefined}
+            placeholderText="End date"
+            className="w-32 px-3 py-1.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            dateFormat="MMM d, yyyy"
+          />
         </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => { setStartDate(null); setEndDate(null); }}
+            className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Sales Table */}
-      <div className="card-bevel bg-gradient-to-br from-gray-800 to-gray-900">
-        <div className="p-6 border-b border-gray-700">
-          <h2 className="text-lg font-medium text-gray-200">Sales History</h2>
+      <div className="card-bevel overflow-hidden">
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-sm font-semibold text-gray-200">Sales History</h2>
         </div>
-        <div className="p-6">
-          {loading ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-500 border-t-transparent"></div>
-            </div>
-          ) : sales.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="h-12 w-12 text-gray-600 mx-auto mb-4" />
-              <p className="text-gray-400">No sales found for the selected period</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800/80 backdrop-blur-sm sticky top-0">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Date</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Customer</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Type</th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-gray-300">Details</th>
-                    <th className="px-6 py-4 text-right text-sm font-medium text-gray-300">Amount</th>
-                    <th className="px-6 py-4 text-right text-sm font-medium text-gray-300">Payment</th>
+        <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+          <table className="w-full">
+            <thead className="bg-gray-800/80 backdrop-blur-sm sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Date</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Customer</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Type</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Details</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Payment</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    Loading...
+                  </td>
+                </tr>
+              ) : sales.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-400 text-sm">
+                    No sales found for the selected period
+                  </td>
+                </tr>
+              ) : (
+                sales.map((sale, index) => (
+                  <tr
+                    key={sale.id}
+                    className={`${index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-750'} hover:bg-gray-700 transition-colors`}
+                  >
+                    <td className="px-4 py-3 text-sm text-gray-300">
+                      {new Date(sale.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-300">
+                      {sale.customer_name || 'Walk-in'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`
+                        inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                        ${sale.sale_type === 'repair' ? 'bg-green-900/20 text-green-400' : ''}
+                        ${sale.sale_type === 'retail' ? 'bg-purple-900/20 text-purple-400' : ''}
+                        ${sale.sale_type === 'pickup' ? 'bg-orange-900/20 text-orange-400' : ''}
+                      `}>
+                        {sale.sale_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {renderSaleDetails(sale)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm font-medium text-gray-200">
+                      {formatCurrency(sale.total_amount)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700/50 text-gray-300">
+                        {sale.payment_method}
+                      </span>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {sales.map((sale, index) => (
-                    <tr
-                      key={sale.id}
-                      className="hover:bg-gray-800/60 transition-colors"
-                    >
-                      <td className="px-6 py-4 text-gray-300">
-                        {new Date(sale.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-gray-300">
-                        {sale.customer_name || 'Walk-in'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`
-                          inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
-                          ${sale.sale_type === 'repair' ? 'bg-green-900/20 text-green-400' : ''}
-                          ${sale.sale_type === 'retail' ? 'bg-purple-900/20 text-purple-400' : ''}
-                          ${sale.sale_type === 'pickup' ? 'bg-orange-900/20 text-orange-400' : ''}
-                        `}>
-                          {sale.sale_type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {renderSaleDetails(sale)}
-                      </td>
-                      <td className="px-6 py-4 text-right font-medium text-gray-200">
-                        {formatCurrency(sale.total_amount)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-700/50 text-gray-300">
-                          {sale.payment_method}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

@@ -8,11 +8,9 @@ import {
   Download,
   Upload,
   CreditCard,
-  MessageSquare,
   Settings,
   Package,
   ShoppingBag,
-  QrCode,
   Megaphone,
   BarChart3,
   Target,
@@ -93,7 +91,6 @@ const menuGroups = [
       { icon: Download, label: "Drop", to: "/drop", permission: "create_drop" },
       { icon: Upload, label: "Pickup", to: "/pickup", permission: "create_pickup" },
       { icon: CreditCard, label: "Balances", to: "/balances" },
-      { icon: MessageSquare, label: "Messages", to: "/messages", permission: "send_messages", badge: true },
     ]
   },
   {
@@ -102,7 +99,6 @@ const menuGroups = [
       { icon: Settings, label: "Operation", to: "/operation", permission: "view_operations" },
       { icon: Wallet, label: "Expenses", to: "/expenses" },
       { icon: ShoppingBag, label: "Sales", to: "/sales", permission: "view_sales" },
-      { icon: QrCode, label: "QR Codes", to: "/qrcodes", permission: "view_qrcodes" },
     ]
   },
   {
@@ -112,7 +108,6 @@ const menuGroups = [
       { icon: BarChart3, label: "Reports", to: "/reports", permission: "view_reports", roles: ["admin", "manager"] },
       { icon: Target, label: "Business Targets", to: "/business-targets", permission: "view_business_targets" },
       { icon: Receipt, label: "Invoices", to: "/invoices", roles: ["admin", "manager"] },
-      { icon: UserCog, label: "Staff", to: "/staff", permission: "manage_staff", roles: ["admin", "manager"] },
       { icon: Shield, label: "Admin", to: "/admin", permission: "manage_users", roles: ["admin"] },
     ]
   }

@@ -24,7 +24,7 @@ export default function OperationPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const [timeFilter, setTimeFilter] = useState<'today' | 'tomorrow' | 'all' | 'custom'>('today');
+  const [timeFilter, setTimeFilter] = useState<'today' | 'all' | 'custom'>('today');
   const [customDate, setCustomDate] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const { operations } = useOperation();
@@ -222,7 +222,8 @@ export default function OperationPage() {
     paid: operation.paidAmount || 0,
     balance: (operation.totalAmount || 0) - (operation.paidAmount || 0),
     discount: (operation as any).discount || 0,
-    status: operation.status,
+    status: operation.workflowStatus || 'pending',
+    paymentStatus: operation.paymentStatus || 'unpaid',
     isNoCharge: operation.isNoCharge || false,
     isDoOver: operation.isDoOver || false,
     isDelivery: operation.isDelivery || false,
@@ -242,16 +243,11 @@ export default function OperationPage() {
 
     const itemDate = new Date(item.createDate);
     const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
 
     let matchesTimeFilter = true;
     switch (timeFilter) {
       case 'today':
         matchesTimeFilter = itemDate.toDateString() === today.toDateString();
-        break;
-      case 'tomorrow':
-        matchesTimeFilter = itemDate.toDateString() === tomorrow.toDateString();
         break;
       case 'custom':
         if (customDate) {
@@ -440,19 +436,20 @@ export default function OperationPage() {
 
       {activeTab === 'expenses' && (
         <div className="card-bevel overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-800">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Date</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Title</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Category</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Staff</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Vendor</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
-                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Payment</th>
-              </tr>
-            </thead>
+          <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+            <table className="w-full">
+              <thead className="bg-gray-800/80 backdrop-blur-sm sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Date</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Title</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Category</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Staff</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Vendor</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
+                  <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Payment</th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-gray-700">
               {expenses.length === 0 ? (
                 <tr>
@@ -509,7 +506,8 @@ export default function OperationPage() {
                 ))
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       )}
 
@@ -536,15 +534,6 @@ export default function OperationPage() {
             >
               <Calendar className="h-5 w-5 mr-2" />
               Today
-            </button>
-            <button
-              className={`btn-bevel px-6 py-2 rounded-lg flex items-center ${
-                timeFilter === 'tomorrow' ? 'accent-primary' : 'accent-secondary'
-              }`}
-              onClick={() => { setTimeFilter('tomorrow'); setCustomDate(''); }}
-            >
-              <Clock className="h-5 w-5 mr-2" />
-              Tomorrow
             </button>
             <button
               className={`btn-bevel px-6 py-2 rounded-lg flex items-center ${
@@ -582,23 +571,24 @@ export default function OperationPage() {
       {/* Work Table */}
       {activeTab === 'operations' && (
       <div className="card-bevel overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-800">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Ticket No</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Customer ID</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Created By</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Name</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Pairs</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Created</th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Ready By</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Balance</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Flags</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Actions</th>
-            </tr>
-          </thead>
+        <div className="max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
+          <table className="w-full">
+            <thead className="bg-gray-800/80 backdrop-blur-sm sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Ticket No</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Customer ID</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Created By</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Name</th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Pairs</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Created</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-300">Ready By</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Amount</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-300">Balance</th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Flags</th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Status</th>
+                <th className="px-4 py-3 text-center text-sm font-medium text-gray-300">Actions</th>
+              </tr>
+            </thead>
           <tbody className="divide-y divide-gray-700">
             {filteredWorkItems.map((item, index) => (
               <tr 
@@ -703,7 +693,8 @@ export default function OperationPage() {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                     ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : ''}
                     ${item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : ''}
-                    ${item.status === 'completed' ? 'bg-green-100 text-green-800' : ''}
+                    ${item.status === 'ready' ? 'bg-indigo-100 text-indigo-800' : ''}
+                    ${item.status === 'delivered' ? 'bg-green-100 text-green-800' : ''}
                     ${item.status === 'held' ? 'bg-purple-100 text-purple-800' : ''}
                     ${item.status === 'cancelled' ? 'bg-red-100 text-red-800' : ''}
                   `}>
@@ -737,7 +728,8 @@ export default function OperationPage() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
       )}
 

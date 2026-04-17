@@ -1,5 +1,6 @@
 import express from 'express';
 import db from '../database';
+import { applyPaymentsToOperation, PaymentInput } from '../helpers/applyPayments';
 
 const router = express.Router();
 
@@ -78,62 +79,56 @@ router.post('/:customerId/apply-credit-to-debts', async (req, res) => {
     let remainingCredit = availableCredit;
 
     try {
-      await db.withTransaction(async () => {
-        // Apply credit to debts (oldest first)
-        for (const operation of unpaidOperations) {
-          if (remainingCredit <= 0) break;
+      // Apply credit to debts using the shared helper (oldest first)
+      for (const operation of unpaidOperations) {
+        if (remainingCredit <= 0) break;
 
-          const operationBalance = operation.total_amount - (operation.paid_amount || 0);
-          const paymentAmount = Math.min(remainingCredit, operationBalance);
+        const operationBalance = Number(operation.total_amount) - Number(operation.paid_amount || 0);
+        const paymentAmount = Math.min(remainingCredit, operationBalance);
 
-          if (paymentAmount > 0) {
-            // Create payment record
-            const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            await db.run(`
-              INSERT INTO operation_payments (id, operation_id, payment_method, amount, transaction_id, created_at)
-              VALUES ($1, $2, $3, $4, $5, $6)
-            `, [paymentId, operation.id, 'store_credit', paymentAmount, `auto-credit-${paymentId.slice(-8)}`, now]);
+        if (paymentAmount > 0) {
+          const payment: PaymentInput = {
+            method: 'store_credit',
+            amount: paymentAmount,
+            transaction_id: `auto-credit-${Date.now()}`
+          };
 
-            // Update operation paid amount
-            const newPaidAmount = (operation.paid_amount || 0) + paymentAmount;
-            await db.run(`
-              UPDATE operations
-              SET paid_amount = $1,
-                  status = CASE WHEN $2 >= total_amount THEN 'completed' ELSE status END,
-                  updated_at = $3
-              WHERE id = $4
-            `, [newPaidAmount, newPaidAmount, now, operation.id]);
+          // Use the shared helper to apply the payment
+          const result = await applyPaymentsToOperation(operation.id, [payment], 'store_credit');
 
-            // Deduct from customer credit
-            await db.run(`
-              UPDATE customers
-              SET account_balance = account_balance - $1
-              WHERE id = $2
-            `, [paymentAmount, customerId]);
-
-            // Record credit debit transaction
-            await db.run(`
-              INSERT INTO customer_credits (id, customer_id, type, amount, description, balance_after, created_at)
-              VALUES ($1, $2, 'debit', $3, $4, $5, $6)
-            `, [
-              `credit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              customerId,
-              paymentAmount,
-              `Auto-payment for operation #${operation.id.slice(-6)}`,
-              (customer.account_balance || 0) - paymentAmount,
-              now
-            ]);
-
-            paymentsMade.push({
-              operationId: operation.id,
-              amount: paymentAmount,
-              remainingBalance: operationBalance - paymentAmount
-            });
-
-            remainingCredit -= paymentAmount;
+          if (!result.success) {
+            console.error(`[apply-credit-to-debts] Failed to apply payment to operation ${operation.id}:`, result.error);
+            continue; // Skip this operation and try the next one
           }
+
+          // Deduct from customer credit (the helper doesn't do this for store_credit)
+          const newBalance = (customer.account_balance || 0) - paymentAmount;
+          await db.run(`
+            UPDATE customers SET account_balance = $1 WHERE id = $2
+          `, [newBalance, customerId]);
+
+          // Record credit debit transaction
+          await db.run(`
+            INSERT INTO customer_credits (id, customer_id, type, amount, description, balance_after, created_at)
+            VALUES ($1, $2, 'debit', $3, $4, $5, $6)
+          `, [
+            `credit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            customerId,
+            paymentAmount,
+            `Auto-payment for operation #${operation.id.slice(-6)}`,
+            newBalance,
+            now
+          ]);
+
+          paymentsMade.push({
+            operationId: operation.id,
+            amount: paymentAmount,
+            remainingBalance: operationBalance - paymentAmount
+          });
+
+          remainingCredit -= paymentAmount;
         }
-      });
+      }
 
       // Get updated customer info
       const updatedCustomer = await db.get('SELECT account_balance FROM customers WHERE id = $1', [customerId]);

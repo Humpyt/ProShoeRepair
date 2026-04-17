@@ -129,8 +129,28 @@ export async function createSchema(pool: Pool): Promise<void> {
         created_by TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW(),
+        -- New payment flow fields (2024-04-17)
+        workflow_status TEXT DEFAULT 'pending',
+        payment_status TEXT DEFAULT 'unpaid',
+        picked_up_at TIMESTAMPTZ,
         FOREIGN KEY (customer_id) REFERENCES customers(id)
       )
+    `);
+
+    // Add new columns if they don't exist (for existing databases)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'workflow_status') THEN
+          ALTER TABLE operations ADD COLUMN workflow_status TEXT DEFAULT 'pending';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'payment_status') THEN
+          ALTER TABLE operations ADD COLUMN payment_status TEXT DEFAULT 'unpaid';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'operations' AND column_name = 'picked_up_at') THEN
+          ALTER TABLE operations ADD COLUMN picked_up_at TIMESTAMPTZ;
+        END IF;
+      END $$
     `);
 
     // ============================================
@@ -504,6 +524,9 @@ export async function createSchema(pool: Pool): Promise<void> {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_operations_is_do_over ON operations(is_do_over) WHERE is_do_over = true`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_operations_is_delivery ON operations(is_delivery) WHERE is_delivery = true`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_operations_is_pickup ON operations(is_pickup) WHERE is_pickup = true`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_operations_workflow_status ON operations(workflow_status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_operations_payment_status ON operations(payment_status)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_operations_picked_up_at ON operations(picked_up_at)`);
 
     // Operation shoes indexes
     await client.query(`CREATE INDEX IF NOT EXISTS idx_operation_shoes_operation ON operation_shoes(operation_id)`);
@@ -515,6 +538,7 @@ export async function createSchema(pool: Pool): Promise<void> {
 
     // Operation payments indexes
     await client.query(`CREATE INDEX IF NOT EXISTS idx_operation_payments_operation ON operation_payments(operation_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_operation_payments_created_at ON operation_payments(created_at)`);
 
     // Operation retail items indexes
     await client.query(`CREATE INDEX IF NOT EXISTS idx_operation_retail_items_operation ON operation_retail_items(operation_id)`);

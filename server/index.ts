@@ -111,13 +111,15 @@ app.post('/api/customers', async (req, res) => {
     const { name, phone, email, address } = req.body;
     const id = uuidv4();
     const now = new Date().toISOString();
+    // Always capitalize first letter of name
+    const capitalizedName = name ? name.trim().charAt(0).toUpperCase() + name.trim().slice(1) : '';
 
     await db.run(`
       INSERT INTO customers (id, name, phone, email, address, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [id, name, phone, email || null, address || null, now, now]);
+    `, [id, capitalizedName, phone, email || null, address || null, now, now]);
 
-    res.json({ id, name, phone, email, address });
+    res.json({ id, name: capitalizedName, phone, email, address });
   } catch (error) {
     console.error('Error creating customer:', error);
     res.status(500).json({ error: 'Failed to create customer' });

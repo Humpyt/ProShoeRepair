@@ -23,6 +23,8 @@ interface Operation {
   customer: Customer | null;
   shoes: ShoeItem[];
   status: 'pending' | 'in_progress' | 'completed' | 'held' | 'cancelled';
+  workflowStatus: 'pending' | 'in_progress' | 'ready' | 'delivered' | 'cancelled';
+  paymentStatus: 'unpaid' | 'partial' | 'paid' | 'overpaid';
   totalAmount: number;
   paidAmount?: number;
   discount?: number;
@@ -31,9 +33,12 @@ interface Operation {
   isDelivery?: boolean;
   isPickup?: boolean;
   notes?: string;
+  promisedDate?: string;
+  pickedUpAt?: string;
   created_by?: string;
   createdAt: string;
   updatedAt: string;
+  paymentRecords?: any[];
 }
 
 interface OperationContextType {

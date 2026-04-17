@@ -9,10 +9,10 @@ export default function ReadyToPickPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
-  // Convert operations to pickup tickets, filtering by 'ready' OR if it's generally expected for pickup
-  // We'll filter strictly by 'ready' status based on typical convention
+  // Convert operations to pickup tickets, filtering by 'ready' OR 'delivered' workflow status
+  // These are operations that are ready to be picked up by the customer
   const tickets = operations
-    .filter(op => (op.status as string) === 'ready' || op.status === 'completed')
+    .filter(op => op.workflowStatus === 'ready' || op.workflowStatus === 'delivered')
     .map(op => {
       const discount = (op as any).discount || 0;
       const originalTotal = op.totalAmount + discount;
@@ -25,7 +25,8 @@ export default function ReadyToPickPage() {
         total: op.totalAmount,
         originalTotal: originalTotal,
         discount: discount,
-        status: op.status,
+        status: op.workflowStatus,
+        paymentStatus: op.paymentStatus,
       };
     });
 

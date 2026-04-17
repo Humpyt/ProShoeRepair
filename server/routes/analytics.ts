@@ -566,29 +566,195 @@ router.get('/profit-summary', async (req, res) => {
   }
 });
 
+// DEBUG: Check what's actually in operation_payments
+router.get('/debug-payments', async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    // Get ALL payments for the date
+    const allPayments = await db.all(`
+      SELECT * FROM operation_payments
+      WHERE DATE(created_at) = DATE($1)
+      ORDER BY created_at DESC
+    `, [targetDate]) as any[];
+
+    // Get unique payment methods
+    const methods = await db.all(`
+      SELECT DISTINCT payment_method FROM operation_payments
+      WHERE DATE(created_at) = DATE($1)
+    `, [targetDate]) as any[];
+
+    // Get count by raw method
+    const byMethodRaw = await db.all(`
+      SELECT payment_method, COUNT(*) as count, SUM(amount) as total
+      FROM operation_payments
+      WHERE DATE(created_at) = DATE($1)
+      GROUP BY payment_method
+    `, [targetDate]) as any[];
+
+    // Get count by normalized method (what the query does)
+    const byMethodNormalized = await db.all(`
+      SELECT
+        CASE payment_method
+          WHEN 'cash' THEN 'Cash'
+          WHEN 'mobile_money' THEN 'Mobile Money'
+          WHEN 'bank_card' THEN 'Credit Card'
+          WHEN 'bank_transfer' THEN 'Bank Transfer'
+          WHEN 'cheque' THEN 'Cheque'
+          WHEN 'store_credit' THEN 'Store Credit'
+          ELSE payment_method
+        END as paymentMethod,
+        COUNT(*) as count,
+        SUM(amount) as total
+      FROM operation_payments
+      WHERE DATE(created_at) = DATE($1)
+      GROUP BY CASE payment_method
+          WHEN 'cash' THEN 'Cash'
+          WHEN 'mobile_money' THEN 'Mobile Money'
+          WHEN 'bank_card' THEN 'Credit Card'
+          WHEN 'bank_transfer' THEN 'Bank Transfer'
+          WHEN 'cheque' THEN 'Cheque'
+          WHEN 'store_credit' THEN 'Store Credit'
+          ELSE payment_method
+        END
+    `, [targetDate]) as any[];
+
+    console.log('[DEBUG] Target date:', targetDate);
+    console.log('[DEBUG] All payments count:', allPayments.length);
+    console.log('[DEBUG] Payments:', JSON.stringify(allPayments));
+    console.log('[DEBUG] Unique methods:', methods);
+    console.log('[DEBUG] By raw method:', byMethodRaw);
+    console.log('[DEBUG] By normalized method:', byMethodNormalized);
+
+    res.json({
+      targetDate,
+      allPayments,
+      byMethodRaw,
+      byMethodNormalized,
+      serverTime: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // GET /api/analytics/daily-balance - Returns daily balance sheet with sales/expenses breakdown by payment method
 router.get('/daily-balance', async (req, res) => {
   try {
     const { date } = req.query;
     const targetDate = date || new Date().toISOString().split('T')[0];
-    const startOfDay = `${targetDate} 00:00:00`;
-    const endOfDay = `${targetDate} 23:59:59`;
 
-    // Get sales breakdown by payment method from operation_payments
-    // Use date() function for proper date comparison (created_at is ISO format)
+    console.log('[BALANCE] Fetching for date:', targetDate);
+
+    // Get total paid amounts from operations table directly (authoritative source)
+    const operationPaymentsResult = await db.all(`
+      SELECT
+        COALESCE(SUM(paid_amount), 0) as totalPaid,
+        COUNT(*) as operationCount
+      FROM operations
+      WHERE DATE(created_at) = DATE($1)
+        AND paid_amount > 0
+    `, [targetDate]) as any[];
+
+    console.log('[BALANCE] Operations paid summary:', JSON.stringify(operationPaymentsResult));
+
+    // Get payment breakdown from operation_payments table with detailed grouping
+    // Normalize payment method names to display format
     const salesResult = await db.all(`
       SELECT
-        COALESCE(op.payment_method, 'Cash') as paymentMethod,
+        COALESCE(
+          CASE
+            WHEN LOWER(op.payment_method) = 'cash' THEN 'Cash'
+            WHEN LOWER(op.payment_method) = 'mobile money' THEN 'Mobile Money'
+            WHEN LOWER(op.payment_method) = 'credit card' THEN 'Credit Card'
+            WHEN LOWER(op.payment_method) = 'bank transfer' THEN 'Bank Transfer'
+            WHEN LOWER(op.payment_method) = 'cheque' THEN 'Cheque'
+            WHEN LOWER(op.payment_method) = 'store credit' THEN 'Store Credit'
+            ELSE op.payment_method
+          END, 'Cash'
+        ) as paymentMethod,
         COALESCE(SUM(op.amount), 0) as total
       FROM operation_payments op
       WHERE DATE(op.created_at) = DATE($1)
-      GROUP BY op.payment_method
+      GROUP BY 1
     `, [targetDate]) as any[];
+
+    console.log('[BALANCE] Raw sales result from operation_payments:', JSON.stringify(salesResult));
+
+    // If no payments found in operation_payments, use a simpler fallback query
+    let normalizedSalesResult = salesResult;
+    if (salesResult.length === 0) {
+      // Try querying with just the raw payment_method to see what's stored
+      const rawPayments = await db.all(`
+        SELECT payment_method, amount, created_at FROM operation_payments
+        WHERE DATE(created_at) = DATE($1)
+        LIMIT 10
+      `, [targetDate]) as any[];
+      console.log('[BALANCE] Raw payment records:', JSON.stringify(rawPayments));
+    }
+
+    // Build normalized sales by method map
+    const salesByMethod: Record<string, number> = {
+      'Cash': 0,
+      'Mobile Money': 0,
+      'Credit Card': 0,
+      'Bank Transfer': 0,
+      'Cheque': 0
+    };
+
+    // Map each result to our normalized keys (case-insensitive matching)
+    for (const s of salesResult) {
+      const method = s.paymentMethod;
+      const total = Number(s.total) || 0;
+
+      // Case-insensitive match
+      if (method.toLowerCase() === 'cash') {
+        salesByMethod['Cash'] += total;
+      } else if (method.toLowerCase() === 'mobile money') {
+        salesByMethod['Mobile Money'] += total;
+      } else if (method.toLowerCase() === 'credit card') {
+        salesByMethod['Credit Card'] += total;
+      } else if (method.toLowerCase() === 'bank transfer') {
+        salesByMethod['Bank Transfer'] += total;
+      } else if (method.toLowerCase() === 'cheque') {
+        salesByMethod['Cheque'] += total;
+      } else {
+        // Try to match with original stored value
+        salesByMethod['Cash'] += total; // Default to cash for unknown methods
+      }
+    }
+
+    // If operation_payments has no data but operations table shows payments, use operations data
+    const totalFromOperationPayments = Object.values(salesByMethod).reduce((a, b) => a + b, 0);
+    const totalPaidFromOperations = Number(operationPaymentsResult[0]?.totalPaid) || 0;
+
+    console.log('[BALANCE] Total from operation_payments:', totalFromOperationPayments);
+    console.log('[BALANCE] Total from operations table:', totalPaidFromOperations);
+
+    // If operation_payments is empty but operations shows payments, allocate to Cash
+    if (totalFromOperationPayments === 0 && totalPaidFromOperations > 0) {
+      console.log('[BALANCE] Using fallback: allocating total from operations to Cash');
+      salesByMethod['Cash'] = totalPaidFromOperations;
+    }
+
+    console.log('[BALANCE] Final salesByMethod:', JSON.stringify(salesByMethod));
 
     // Get expenses breakdown by payment method
     const expensesResult = await db.all(`
       SELECT
-        COALESCE(payment_method, 'Cash') as paymentMethod,
+        COALESCE(
+          CASE
+            WHEN LOWER(payment_method) = 'cash' THEN 'Cash'
+            WHEN LOWER(payment_method) = 'mobile money' THEN 'Mobile Money'
+            WHEN LOWER(payment_method) = 'credit card' THEN 'Credit Card'
+            WHEN LOWER(payment_method) = 'bank transfer' THEN 'Bank Transfer'
+            WHEN LOWER(payment_method) = 'cheque' THEN 'Cheque'
+            WHEN LOWER(payment_method) = 'store credit' THEN 'Store Credit'
+            ELSE payment_method
+          END, 'Cash'
+        ) as paymentMethod,
         COALESCE(SUM(amount), 0) as total
       FROM expenses
       WHERE date = $1
@@ -615,18 +781,6 @@ router.get('/daily-balance', async (req, res) => {
       notes: e.notes || ''
     }));
 
-    // Build sales by method map
-    const salesByMethod: Record<string, number> = {
-      'Cash': 0,
-      'Mobile Money': 0,
-      'Credit Card': 0,
-      'Bank Transfer': 0,
-      'Cheque': 0
-    };
-    for (const s of salesResult) {
-      salesByMethod[s.paymentMethod] = s.total;
-    }
-
     // Build expenses by method map
     const expensesByMethod: Record<string, number> = {
       'Cash': 0,
@@ -636,7 +790,21 @@ router.get('/daily-balance', async (req, res) => {
       'Cheque': 0
     };
     for (const e of expensesResult) {
-      expensesByMethod[e.paymentMethod] = e.total;
+      const method = e.paymentMethod;
+      const total = Number(e.total) || 0;
+      if (method.toLowerCase() === 'cash') {
+        expensesByMethod['Cash'] += total;
+      } else if (method.toLowerCase() === 'mobile money') {
+        expensesByMethod['Mobile Money'] += total;
+      } else if (method.toLowerCase() === 'credit card') {
+        expensesByMethod['Credit Card'] += total;
+      } else if (method.toLowerCase() === 'bank transfer') {
+        expensesByMethod['Bank Transfer'] += total;
+      } else if (method.toLowerCase() === 'cheque') {
+        expensesByMethod['Cheque'] += total;
+      } else {
+        expensesByMethod['Cash'] += total;
+      }
     }
 
     // Calculate totals
@@ -647,6 +815,8 @@ router.get('/daily-balance', async (req, res) => {
     const cardBalance = salesByMethod['Credit Card'] - expensesByMethod['Credit Card'];
     const bankTransferBalance = salesByMethod['Bank Transfer'] - expensesByMethod['Bank Transfer'];
     const chequeBalance = salesByMethod['Cheque'] - expensesByMethod['Cheque'];
+
+    console.log('[BALANCE] Final totals:', { totalSales, totalExpenses, cashAtHand });
 
     res.json({
       date: targetDate,

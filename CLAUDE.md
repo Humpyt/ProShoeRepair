@@ -4,24 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A full-stack Point of Sale (POS) system for shoe repair businesses. Built with React + TypeScript (Vite) frontend and Express + PostgreSQL backend.
+A full-stack Point of Sale (POS) system for shoe repair businesses. Built with React + TypeScript (Vite) frontend and Express + PostgreSQL backend with a SQLite-compatible wrapper layer. Currency is Ugandan Shilling (UGX, 0 decimal places).
+
+**Important:** The database uses PostgreSQL via `pg` Pool, but a compatibility layer (`server/database.ts`) wraps it to provide SQLite-like `db.run()`, `db.get()`, `db.all()` methods. Always use this wrapper, not raw `pool.query()` directly.
 
 ## Development Commands
 
 **Environment setup:**
 ```bash
-cp .env.example .env  # Configure environment variables
+cp .env.example .env
 ```
 
-**Start development servers (both client and server):**
+**Start both client and server:**
 ```bash
 npm run dev
 ```
-
-**Git worktrees:** This project uses git worktrees for isolated feature development.
-- `.worktrees/drop-workflow/` - Active worktree for Drop page enhancements (branch: drop-workflow)
-- To create a new worktree: `git worktree add ../new-feature main`
-- Worktrees are listed in `.worktrees/` directory
 
 **Start individual servers:**
 ```bash
@@ -36,189 +33,165 @@ npm run lint     # ESLint with TypeScript rules
 npm run preview  # Preview production build locally
 ```
 
-**Database utilities:**
-```bash
-npm run init:supplies     # Initialize supplies table
-npm run add:supplies      # Add dummy supply data
-```
-
-**Database seeding scripts (run via tsx):**
+**Database seeding (via tsx):**
 ```bash
 tsx server/reset_database.ts     # Reset and reinitialize database
-tsx server/add_customers.ts      # Add sample customer data
-tsx server/add_services.ts       # Add sample service data
+tsx server/add_services.ts      # Add sample service data
 ```
 
-**Service management:**
+**Import services from pricing.txt:**
 ```bash
-npm run import:services          # Import services from pricing.txt to database
-npm run cleanup:services         # Remove duplicate services from database
+npm run import:services    # Import 45 services with UGX pricing
+npm run cleanup:services   # Remove duplicate services
 ```
+
+## Development Guidelines
+
+Behavioral guidelines derived from Andrej Karpathy's LLM coding observations. These complement the project-specific rules above.
+
+**Tradeoff:** These bias toward caution over speed. For trivial tasks, use judgment.
+
+### 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+### 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: *"Would a senior engineer say this is overcomplicated?"* If yes, simplify.
+
+### 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that *your* changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+**Test:** Every changed line should trace directly to the user's request.
+
+### 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan before starting:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
 ## Architecture
 
 ### Backend (Express + PostgreSQL)
 
-- **Entry point:** `server/index.ts` - Express server on port 3000
-- **Database:** PostgreSQL via `pg` Pool (`server/database.ts`)
-  - Connection: `cavemo-repair` database on localhost:5432
-  - Uses `server/db/postgres-schema.ts` for schema definitions
-  - Uses `server/db/postgres-seeds.ts` for seed data
-  - Auto-seeding: Database seeds default categories, services, and products on first run
-- **Auto-seeding:**
+**Entry point:** `server/index.ts` (port 3000)
 
-**Router structure:** Modular routers in `server/routes/`:
-- `operations.ts` - Main router mounted at `/api/operations` (also at `server/operations.ts`)
-- `orders.ts` - Order management endpoints
-- `inventory.ts` - Inventory management
-- `sales.ts` - Sales endpoints
-- `printer.ts` - Thermal printer integration
-- `qrcodes.ts` - QR code generation
-- `supplies.ts` - Supplies tracking
-- `categories.ts` - Product categories
-- `products.ts` - Product catalog
-- `analytics.ts` - Analytics and reporting data
-- `auth.ts` - Authentication endpoints
-- `business.ts` - Business settings and configuration
-- `credits.ts` - Customer credits management
-- `expenses.ts` - Expense tracking endpoints
-- `invoices.ts` - Invoice generation and management
-- `retailProducts.ts` - Retail product management
-- `staffMessages.ts` - Staff communication/messaging
-- `ticket.ts` - Ticket-specific endpoints
-- `colors.ts` - Color/swatch management
-- `sales.ts` - Sales transaction endpoints
+**Database:** PostgreSQL via `pg` Pool (`server/database.ts`)
+- Connection: `cavemo-repair` database on localhost:5432
+- Schema: `server/db/postgres-schema.ts`
+- Seeds: `server/db/postgres-seeds.ts` (auto-runs on startup)
+- Uses `withTransaction()` helper for multi-step operations
 
-**Database schema key tables:**
-- `customers` - Customer records with loyalty points, total_orders, total_spent
-- `operations` - Repair orders (linked to customers, supports no_charge, do_over, delivery, pickup flags)
-- `operation_shoes` - Individual shoes in an order
-- `operation_services` - Services applied to each shoe
-- `services` - Available services with pricing and estimated_days
-- `sales_categories` / `sales_items` - Retail product categories and items
-- `products` / `categories` - Additional product catalog (uses ProductContext)
-- `supplies` - Supply inventory tracking with low-stock alerts
-- `inventory_items` - Full inventory management system
-- `sales` - Transaction tracking (repair, retail, pickup types)
-- `qrcodes` - QR code storage
+**Routers** (mounted at `/api/<name>`):
+- `operations` - Repair order management (main `/api/operations` router)
+- `routes/inventory` - Inventory management
+- `routes/printer` - Thermal printer integration (escpos/node-thermal-printer)
+- `routes/sales` - Sales transactions
+- `routes/qrcodes` - QR code generation
+- `routes/supplies` - Supply inventory tracking
+- `routes/categories` - Product categories
+- `routes/products` - Product catalog
+- `routes/analytics` - Reporting data
+- `routes/auth` - Authentication
+- `routes/business` - Business settings
+- `routes/credits` - Customer credits
+- `routes/expenses` - Expense tracking
+- `routes/invoices` - Invoice management
+- `routes/retailProducts` - Retail product catalog
+- `routes/staffMessages` - Staff messaging
+- `routes/ticket` - Ticket-specific endpoints
+- `routes/colors` - Color/swatch management
+
+**Key tables:** `customers`, `operations`, `operation_shoes`, `operation_services`, `services`, `products`, `categories`, `supplies`, `inventory_items`, `sales`, `sales_items`, `sales_categories`
 
 ### Frontend (React + Vite)
 
-**State management:** Context-based architecture with nested providers
-- `CustomerProvider` → `OperationProvider` → `AdminProvider` → `CartProvider` → `ProductProvider` → `ServiceProvider`
-- `CustomerContext` - Customer data and operations
+**Context provider nesting** (outer to inner):
+```
+CustomerProvider → OperationProvider → AdminProvider → CartProvider → ProductProvider → ServiceProvider
+```
+- `CustomerContext` - Customer data
 - `OperationContext` - Repair order/ticket management
-- `ProductContext` - Product/category catalog management
+- `AdminContext` - Admin state
 - `CartContext` - Shopping cart for sales
-- `AdminContext` - Admin-specific state
+- `ProductContext` - Product/category catalog
 - `ServiceContext` - Service catalog and pricing
-- `ExpenseContext` - Business expense tracking
-- `RetailProductContext` - Retail product catalog
-- `StaffMessageContext` - Staff messaging/communications
+- Also: `ExpenseContext`, `RetailProductContext`, `StaffMessageContext`
 
-**Authentication:** Zustand store (`src/store/authStore.ts`) for local mock auth, also used by DropPage for admin mode
-- Mock users with roles: admin, manager, staff
-- Credentials stored in localStorage
-- Login component at `src/pages/LoginPage.tsx`
-- Test credentials (username / password):
-  - admin@repairpro.com / admin123
-  - manager@repairpro.com / manager123
-  - staff1@repairpro.com / staff123
-- Protected routes use `ProtectedRoute` component with role-based access control
-
-**Routing:** `react-router-dom` v7 with nested routes
-- All routes nested under main layout with collapsible sidebar
-- Protected routes use `ProtectedRoute` component with role-based access
-- Entry point: `src/App.tsx`
-- Online/offline detection built-in with status indicator
+**Authentication:** Zustand store (`src/store/authStore.ts`) with local mock users stored in localStorage. Roles: admin, manager, staff. Login at `src/pages/LoginPage.tsx`. Protected routes use `ProtectedRoute` component.
 
 **Key pages:**
-- `/tickets` - Main tickets/repair orders list
-- `/ticket-search` - Search tickets by various criteria
-- `/drop` - New repair order drop-off (also available as `DropPageLookup.tsx` root file)
+- `/tickets` - Main repair orders list
+- `/ticket-search` - Search tickets
+- `/drop` - New repair order drop-off
 - `/assembly`, `/racking` - Workshop workflow stages
-- `/pickup-order`, `/pickup` - Customer pickup processing
+- `/pickup`, `/pickup-order` - Customer pickup
 - `/deliveries` - Delivery management
-- `/cod-payment` - Cash on delivery payments
-- `/balances` - Overdue/unpaid balances
-- `/commissions` - Staff commission tracking
-- `/business-targets` - Staff performance targets
+- `/sales` - Retail sales
 - `/expenses` - Business expense tracking
 - `/supplies` - Supply inventory management
-- `/sales` - Retail sales
+- `/reports` - Analytics dashboard
 - `/invoices` - Invoice management
-- `/reports` - Analytics and reporting
-- `/marketing` - Customer communications
-- `/credits` - Customer credit list
-- `/operation` - Operation details view
-- `/no-charge-do-over` - No charge / do over orders
-- `/ready-to-pick` - Orders ready for pickup
-- `/customer-rankings` - Customer loyalty rankings
-- `/most-performing` - Most performing items/services
-- `/new-customers` - New customer acquisition
-- `/discounts` - Discount management
-- `/stock-levels` - Inventory stock levels
-- `/store` - Store settings and configuration
-- `/message` - Staff messaging
-- `/unpaid-balances` - Unpaid balance tracking
-- `/operation-page` - Full operation management page
+- `/credits` - Customer credits
+- `/operation-page` - Full operation management
 
-**API integration:** Backend via Vite proxy:
-- Vite dev server proxies `/api` requests to `http://localhost:3000`
-- Direct fetch/axios calls to backend endpoints
+**API integration:** Vite proxy forwards `/api` requests to `http://localhost:3000`. API config at `src/config/api.ts`.
 
-**UI Components:**
-- Material-UI (`@mui/material`) for base components
-- Tailwind CSS for styling
-- Radix UI for select/switch/toast components
-- FontAwesome icons (`@fortawesome/free-solid-svg-icons`) - used alongside Lucide
-- React Hot Toast for notifications
-- React Chart.js 2 and Recharts for analytics
+**UI stack:** Material-UI + Tailwind CSS + Radix UI (select/switch/toast) + Lucide/FontAwesome icons + React Hot Toast + Chart.js 2/Recharts.
 
-**Utility functions:**
-- `src/utils/formatCurrency.ts` - Currency formatting using UGX locale
-- `server/utils.ts` - Data transformers for snake_case ↔ camelCase conversion (transformCustomer, transformOperation, transformService)
+## Critical Development Rules
 
-### Key Features
+**Do NOT delete functionality, remove pages, or make destructive changes unless explicitly requested.** The codebase has had accidental removals of financial summary cards and other functionality. Always read a file's current state before editing. Preserve all existing functionality when adding new features.
 
-- **Repair orders:** Multi-step workflow (drop-off → assembly → racking → pickup)
-- **Quick actions:** Hold/Quick Drop, No Charge/Do Over pages
-- **Inventory management:** Supplies tracking with low-stock alerts
-- **Sales:** Retail items for sale (polish, laces, insoles, accessories)
-- **QR codes:** Generate printable QR codes for various purposes
-- **Thermal printing:** Integration with thermal printers via USB
-- **Role-based access:** Admin-only routes (staff page, admin page)
-- **Reports:** Analytics dashboard with charts
-- **Expenses:** Track and manage business expenses
-- **Commissions:** Staff commission tracking and management
-- **Credits:** Customer credit list management
-- **Invoices:** Invoice generation and management
-- **Marketing:** Customer communication and campaign management
+## Key Implementation Details
 
-## Important Notes
-
-1. **Currency:** System uses Ugandan Shilling (UGX) with 0 decimal places. Currency config is centralized in `src/config/currency.ts` and `server/config/currency.ts`.
-
-2. **Service pricing:** Services are imported from `pricing.txt` file containing 45 services with prices in UGX. Use `npm run import:services` to import/update services. The import script:
-   - Parses CSV format with quoted price fields
-   - Handles price ranges by using maximum value (e.g., "80,000-150,000" → 150,000)
-   - Auto-categorizes services based on name patterns (cleaning, heel, sole, dyeing, etc.)
-   - Assigns estimated days based on service complexity
-   - Safe to re-run (uses INSERT OR REPLACE)
-
-3. **Transaction handling:** Backend uses PostgreSQL transactions via `withTransaction()` helper for multi-step database operations.
-
-7. **Printer support:** Uses `escpos` and `node-thermal-printer` packages for USB thermal printer integration.
-
-8. **Image uploads:** Images are converted to base64 data URLs for local storage (no cloud storage required).
-
-9. **Online/offline detection:** App automatically detects network status and shows offline indicator when disconnected.
-
-10. **Error handling:** Frontend uses `ErrorBoundary` component for catching React errors; backend has error middleware at the end of the Express middleware chain.
-
-11. **Deployment:** Configured for Netlify (see `netlify.toml`) and PM2 for VPS deployment. The Express backend requires a separate Node.js hosting - it won't work on Netlify's serverless functions.
-
-12. **TypeScript:** Uses project references (tsconfig.app.json, tsconfig.node.json) for better type checking across frontend and backend.
+- **Currency formatting:** `src/config/currency.ts` and `server/config/currency.ts` - UGX with 0 decimals
+- **Service import:** `pricing.txt` → `tsx server/import_services_from_pricing.ts`. Parses CSV with quoted prices, handles ranges (uses max value), auto-categorizes by name patterns, safe to re-run (INSERT OR REPLACE)
+- **Snake_case ↔ camelCase:** `server/utils.ts` has `transformCustomer`, `transformOperation`, `transformService`
+- **Image uploads:** Converted to base64 data URLs (no cloud storage)
+- **Online/offline:** Built-in detection with status indicator
+- **Error handling:** `ErrorBoundary` component on frontend; Express error middleware at end of chain
+- **Deployment:** Netlify for frontend (`netlify.toml`), PM2 for VPS. Backend requires separate Node.js hosting.
 
 ## Database Schema Relationships
 
@@ -227,7 +200,6 @@ customers (1) ----< (many) operations
 operations (1) ----< (many) operation_shoes
 operation_shoes (1) ----< (many) operation_services
 services (1) ----< (many) operation_services
-
 categories (1) ----< (many) products
 sales_categories (1) ----< (many) sales_items
 ```

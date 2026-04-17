@@ -11,7 +11,8 @@ interface SearchTicket {
   pieces: number;
   rackNo?: string;
   total: number;
-  status: 'pending' | 'ready' | 'completed';
+  status: 'pending' | 'in_progress' | 'ready' | 'delivered' | 'cancelled';
+  paymentStatus: 'unpaid' | 'partial' | 'paid' | 'overpaid';
   items: {
     category: string;
     color: string;
@@ -36,7 +37,8 @@ export default function TicketSearchPage() {
     date: new Date(op.createdAt).toLocaleDateString(),
     pieces: op.shoes.length,
     total: op.totalAmount / 100,
-    status: op.status,
+    status: op.workflowStatus || 'pending',
+    paymentStatus: op.paymentStatus || 'unpaid',
     items: op.shoes.map(shoe => ({
       category: shoe.category,
       color: shoe.color,
@@ -115,10 +117,14 @@ export default function TicketSearchPage() {
               <div className="flex justify-between items-start mb-2">
                 <div className="font-semibold">Ticket #{ticket.id}</div>
                 <div className={`px-2 py-1 rounded-full text-sm ${
-                  ticket.status === 'completed'
+                  ticket.status === 'delivered' || ticket.status === 'completed'
                     ? 'bg-green-100 text-green-800'
                     : ticket.status === 'ready'
                     ? 'bg-blue-100 text-blue-800'
+                    : ticket.status === 'in_progress'
+                    ? 'bg-indigo-100 text-indigo-800'
+                    : ticket.status === 'cancelled'
+                    ? 'bg-red-100 text-red-800'
                     : 'bg-yellow-100 text-yellow-800'
                 }`}>
                   {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}

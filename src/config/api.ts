@@ -25,4 +25,10 @@ export const API_ENDPOINTS = {
   'business/targets/staff': `${API_URL}/business/targets/staff`,
   'business/targets/summary': `${API_URL}/business/targets/summary`,
   'analytics/new-customers': `${API_URL}/analytics/new-customers`,
+  'analytics/profit-summary': `${API_URL}/analytics/profit-summary`,
+  'analytics/service-performance': `${API_URL}/analytics/service-performance`,
+  'analytics/customer-rankings': `${API_URL}/analytics/customer-rankings`,
+  'analytics/daily-balance': `${API_URL}/analytics/daily-balance`,
+  'analytics/discounts': `${API_URL}/analytics/discounts`,
+  'analytics/unpaid-balances': `${API_URL}/analytics/unpaid-balances`,
 };

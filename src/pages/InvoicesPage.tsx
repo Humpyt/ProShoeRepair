@@ -53,6 +53,15 @@ export default function InvoicesPage() {
     fetchInvoices();
   }, [activeTab]);
 
+  // Listen for drop-completed event to refresh invoices
+  useEffect(() => {
+    const handleDropCompleted = () => {
+      fetchInvoices();
+    };
+    window.addEventListener('drop-completed', handleDropCompleted);
+    return () => window.removeEventListener('drop-completed', handleDropCompleted);
+  }, []);
+
   const fetchInvoices = async () => {
     setLoading(true);
     try {

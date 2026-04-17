@@ -5,13 +5,12 @@ import { Toaster } from 'react-hot-toast';
 import StorePage from './pages/StorePage';
 import DropPage from './pages/DropPage';
 import PickupPage from './pages/PickupPage';
+import PickedItemsPage from './pages/PickedItemsPage';
 import BalancesPage from './pages/BalancesPage';
-import MessagePage from './pages/MessagePage';
 import OperationPage from './pages/OperationPage';
 import OperationDetailsPage from './pages/OperationDetailsPage';
 import SalesItems from './pages/SalesItems';
 import TicketsPage from './pages/TicketsPage';
-import QRCodesPage from './pages/QRCodesPage';
 import MarketingPage from './pages/MarketingPage';
 import NotificationsPage from './pages/NotificationsPage';
 import LoginPage from './pages/LoginPage';
@@ -53,7 +52,6 @@ const CustomerPage = lazy(() => import('./pages/CustomerPage'));
 const SalesPage = lazy(() => import('./pages/SalesPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const BusinessTargetsPage = lazy(() => import('./pages/BusinessTargetsPage'));
-const StaffPage = lazy(() => import('./pages/StaffPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 
@@ -210,13 +208,13 @@ function App() {
                           <PickupPage />
                         </ProtectedRoute>
                       } />
-                      <Route path="balances" element={<BalancesPage />} />
-                      <Route path="operations/details/:id" element={<OperationDetailsPage />} />
-                      <Route path="messages" element={
-                        <ProtectedRoute permission="send_messages">
-                          <MessagePage />
+                      <Route path="picked-items" element={
+                        <ProtectedRoute permission="create_pickup">
+                          <PickedItemsPage />
                         </ProtectedRoute>
                       } />
+                      <Route path="balances" element={<BalancesPage />} />
+                      <Route path="operations/details/:id" element={<OperationDetailsPage />} />
                       <Route path="operation" element={
                         <ProtectedRoute permission="view_operations">
                           <OperationPage />
@@ -243,11 +241,6 @@ function App() {
                       } />
                       <Route path="manage-categories" element={<ProductCategoryManager />} />
                       <Route path="tickets" element={<TicketsPage />} />
-                      <Route path="qrcodes" element={
-                        <ProtectedRoute permission="view_qrcodes">
-                          <QRCodesPage />
-                        </ProtectedRoute>
-                      } />
                       <Route path="marketing" element={
                         <ProtectedRoute permission="view_marketing">
                           <MarketingPage />
@@ -264,13 +257,6 @@ function App() {
                         <ProtectedRoute permission="view_business_targets">
                           <Suspense fallback={<PageLoader />}>
                             <BusinessTargetsPage />
-                          </Suspense>
-                        </ProtectedRoute>
-                      } />
-                      <Route path="staff" element={
-                        <ProtectedRoute permission="manage_staff" requiredRoles={['admin', 'manager']}>
-                          <Suspense fallback={<PageLoader />}>
-                            <StaffPage />
                           </Suspense>
                         </ProtectedRoute>
                       } />
