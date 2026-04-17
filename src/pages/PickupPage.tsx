@@ -146,25 +146,39 @@ export default function PickupPage() {
   const handleMarkPickedUp = async (ticketId: string) => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`${API_ENDPOINTS.operations}/${ticketId}/workflow-status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
-        },
-        body: JSON.stringify({
-          workflow_status: 'delivered',
-          picked_up_at: new Date().toISOString()
-        }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to mark as picked up');
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      };
+      const pickedUpAt = new Date().toISOString();
+
+      // Transition through valid states: pending → in_progress → ready → delivered
+      const transitions = [
+        { status: 'in_progress', picked_up_at: undefined },
+        { status: 'ready', picked_up_at: undefined },
+        { status: 'delivered', picked_up_at: pickedUpAt },
+      ];
+
+      for (const transition of transitions) {
+        const response = await fetch(`${API_ENDPOINTS.operations}/${ticketId}/workflow-status`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            workflow_status: transition.status,
+            ...(transition.picked_up_at && { picked_up_at: transition.picked_up_at }),
+          }),
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || `Failed to transition to ${transition.status}`);
+        }
       }
+
       await refreshOperations();
       setSelectedTicket(null);
     } catch (error) {
       console.error('Failed to mark as picked up:', error);
-      alert('Failed to mark as picked up. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to mark as picked up. Please try again.');
     }
   };
 
