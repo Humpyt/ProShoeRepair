@@ -170,7 +170,8 @@ export default function PickupPage() {
 
   const handlePaymentComplete = async (payments: Array<{ method: string; amount: number }>) => {
     try {
-      const ticketId = payingTicketId;
+      // Use selectedTicket as primary source — always set when PAY button is clicked
+      const ticketId = selectedTicket || payingTicketId;
       if (!ticketId) {
         alert('Error: No ticket selected for payment');
         return;
