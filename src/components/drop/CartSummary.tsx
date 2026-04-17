@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { ShoppingCart, Check, Package, Sparkles, DollarSign, Smartphone, CreditCard } from 'lucide-react';
+import { ShoppingCart, Check, Package, Sparkles, DollarSign, Smartphone, CreditCard, Wallet } from 'lucide-react';
 import { CartItem as CartItemType } from '../../types';
 import CartItemCard from './CartItemCard';
 import { formatCurrency } from '../../utils/formatCurrency';
 
-type PaymentMethod = 'cash' | 'mobile_money' | 'bank_card';
+type PaymentMethod = 'cash' | 'mobile_money' | 'bank_card' | 'store_credit';
 
 interface PaymentEntry {
   method: PaymentMethod;
@@ -21,12 +21,18 @@ interface CartSummaryProps {
   onPriceChange?: (price: number) => void;
   onDone?: (item: CartItemType) => void;
   onCartItemPriceChange?: (id: string, price: number) => void;
+  customer?: {
+    id: string;
+    name: string;
+    accountBalance?: number;
+  } | null;
 }
 
 const PAYMENT_METHODS: { method: PaymentMethod; label: string; icon: React.ElementType }[] = [
   { method: 'cash', label: 'Cash', icon: DollarSign },
   { method: 'mobile_money', label: 'Mobile', icon: Smartphone },
   { method: 'bank_card', label: 'Card', icon: CreditCard },
+  { method: 'store_credit', label: 'Credit', icon: Wallet },
 ];
 
 const CartSummary: React.FC<CartSummaryProps> = ({
@@ -39,17 +45,39 @@ const CartSummary: React.FC<CartSummaryProps> = ({
   onPriceChange,
   onDone,
   onCartItemPriceChange,
+  customer,
 }) => {
   const total = items.reduce((sum, item) => sum + item.price, 0);
   const [paymentAmount, setPaymentAmount] = useState(total > 0 ? total.toString() : '');
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cash');
+  const [creditError, setCreditError] = useState<string | null>(null);
 
   const paidAmount = parseInt(paymentAmount, 10) || 0;
   const balance = Math.max(0, total - paidAmount);
   const itemCount = items.length;
-  const isDisabled = disabled || itemCount === 0;
+  const availableCredit = customer?.accountBalance || 0;
+
+  // Validate store credit when selected
+  const isStoreCreditSelected = selectedMethod === 'store_credit';
+  const hasInsufficientCredit = isStoreCreditSelected && paidAmount > availableCredit;
+  const needsSecondPayment = isStoreCreditSelected && paidAmount < total && paidAmount <= availableCredit;
+
+  const isDisabled = disabled || itemCount === 0 || hasInsufficientCredit || needsSecondPayment;
 
   const handleComplete = () => {
+    // Validate store credit
+    if (selectedMethod === 'store_credit') {
+      if (paidAmount > availableCredit) {
+        setCreditError(`Insufficient credit. Available: ${formatCurrency(availableCredit)}`);
+        return;
+      }
+      if (paidAmount < total) {
+        setCreditError(`Store credit (${formatCurrency(paidAmount)}) is less than total (${formatCurrency(total)}). Please pay the difference with another method.`);
+        return;
+      }
+    }
+    setCreditError(null);
+
     const payments: PaymentEntry[] = [];
     if (paidAmount > 0) {
       payments.push({ method: selectedMethod, amount: paidAmount });
@@ -150,11 +178,12 @@ const CartSummary: React.FC<CartSummaryProps> = ({
               {PAYMENT_METHODS.map(({ method, label, icon: Icon }) => (
                 <button
                   key={method}
-                  onClick={() => setSelectedMethod(method)}
+                  onClick={() => { setSelectedMethod(method); setCreditError(null); }}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
                     selectedMethod === method
                       ? method === 'cash' ? 'bg-emerald-500 text-white'
                         : method === 'mobile_money' ? 'bg-blue-500 text-white'
+                        : method === 'store_credit' ? 'bg-yellow-500 text-white'
                         : 'bg-purple-500 text-white'
                       : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
                   }`}
@@ -168,11 +197,33 @@ const CartSummary: React.FC<CartSummaryProps> = ({
             {/* Amount input */}
             <input
               type="number"
-              placeholder="Enter amount received"
+              max={isStoreCreditSelected ? availableCredit : total}
+              placeholder={isStoreCreditSelected ? "Enter credit amount to use" : "Enter amount received"}
               value={paymentAmount}
-              onChange={(e) => setPaymentAmount(e.target.value)}
+              onChange={(e) => { setPaymentAmount(e.target.value); setCreditError(null); }}
               className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-gray-800 font-bold text-lg placeholder-gray-400 focus:border-indigo-500 focus:outline-none"
             />
+
+            {/* Available credit notice when store_credit is selected */}
+            {isStoreCreditSelected && (
+              <div className="text-xs text-yellow-600 font-medium">
+                Available Credit: {formatCurrency(availableCredit)}
+              </div>
+            )}
+
+            {/* Credit error */}
+            {creditError && (
+              <div className="text-xs text-red-600 font-medium bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {creditError}
+              </div>
+            )}
+
+            {/* Second payment notice */}
+            {needsSecondPayment && (
+              <div className="text-xs text-amber-600 font-medium bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                Remaining {formatCurrency(total - paidAmount)} must be paid with another method
+              </div>
+            )}
 
             {/* Balance info */}
             {paidAmount > 0 && (

@@ -383,7 +383,7 @@ export default function DropPage() {
     }
   };
 
-  const handleComplete = async (data: { payments: Array<{ method: 'cash' | 'mobile_money' | 'bank_card'; amount: number }> }) => {
+  const handleComplete = async (data: { payments: Array<{ method: 'cash' | 'mobile_money' | 'bank_card' | 'store_credit'; amount: number }> }) => {
     if (cartItems.length === 0) {
       toast.error('No items in cart');
       return;
@@ -1163,6 +1163,7 @@ export default function DropPage() {
             onPriceChange={handlePreviewPriceChange}
             onDone={handlePreviewDone}
             onCartItemPriceChange={handleCartItemPriceChange}
+            customer={selectedCustomer}
           />
         </div>
       </div>

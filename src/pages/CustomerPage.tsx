@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { API_ENDPOINTS } from '../config/api';
 import {
   Search, Plus, Filter, Download, Phone, Mail,
@@ -66,6 +66,13 @@ export default function CustomerPage() {
   const [evaluation, setEvaluation] = useState<CustomerEvaluation | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const transactionsPerPage = 3;
+
+  // Compute total earned from credit transactions
+  const totalEarned = useMemo(() => {
+    return creditTransactions
+      .filter(t => t.type === 'credit')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+  }, [creditTransactions]);
   
   const [formData, setFormData] = useState<CustomerFormData>({
     name: '',
@@ -635,6 +642,12 @@ export default function CustomerPage() {
                     {formatCurrency(selectedCustomer.accountBalance || 0)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">Available credit balance</div>
+                  <div className="mt-3 pt-3 border-t border-green-800">
+                    <div className="text-green-300 text-sm">Total Earned</div>
+                    <div className="text-xl font-bold text-green-400">
+                      {formatCurrency(totalEarned)}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Outstanding Debt */}

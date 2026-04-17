@@ -163,8 +163,9 @@ export async function applyPaymentsToOperation(
         );
       }
 
-      // Auto-capture 2% credit on transaction (not for store_credit source)
-      if (source !== 'store_credit' && totalPaymentAmount > 0) {
+      // Auto-capture 2% credit on transaction (not for store_credit source or store_credit payment method)
+      const hasStoreCreditPayment = payments.some(p => p.method === 'store_credit');
+      if (source !== 'store_credit' && !hasStoreCreditPayment && totalPaymentAmount > 0) {
         const creditAmount = Math.round(totalPaymentAmount * 0.02);
         if (creditAmount > 0 && operation.customer_id) {
           const creditTransactionId = `credit_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
